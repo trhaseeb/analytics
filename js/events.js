@@ -19,13 +19,9 @@ App.Events = {
         document.getElementById('dtm-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'dtm'));
         document.getElementById('import-project-input').addEventListener('change', e => App.ImportExport.importProjectOrFeatures(e));
         document.getElementById('export-project-btn').addEventListener('click', () => App.ImportExport.showExportDataModal()); 
-        document.getElementById('manage-categories-btn').onclick = () => App.UI.elements.categoryManagerPanel.classList.add('open');
-        document.getElementById('close-category-manager-btn').onclick = () => App.UI.elements.categoryManagerPanel.classList.remove('open');
         document.getElementById('add-category-btn').onclick = () => App.CategoryManager.addCategory();
         document.getElementById('export-categories-btn').onclick = () => App.ImportExport.exportCategories();
         document.getElementById('import-categories-input').addEventListener('change', e => App.ImportExport.importCategories(e));
-        document.getElementById('manage-contributors-btn').onclick = () => App.UI.elements.contributorManagerPanel.classList.add('open');
-        document.getElementById('close-contributor-manager-btn').onclick = () => App.UI.elements.contributorManagerPanel.classList.remove('open');
         document.getElementById('add-contributor-btn').onclick = () => App.ContributorManager.addContributor();
         document.getElementById('show-only-with-observations-toggle').addEventListener('change', e => {
             App.state.showOnlyWithObservations = e.target.checked;
@@ -53,6 +49,13 @@ App.Events = {
         document.getElementById('toggle-terrain-btn').onclick = () => this.toggleTerrain();
         document.getElementById('toggle-heatmap-btn').onclick = () => this.toggleHeatmap();
         document.getElementById('pointcloud-styling-select').onchange = (e) => this.setPointCloudStyling(e.target.value);
+
+        document.getElementById('open-sidebar-btn').onclick = () => document.getElementById('sidebar').classList.remove('-translate-x-full');
+        document.getElementById('close-sidebar-btn').onclick = () => document.getElementById('sidebar').classList.add('-translate-x-full');
+        document.getElementById('manage-categories-btn').onclick = () => document.getElementById('category-manager-panel').classList.remove('hidden');
+        document.getElementById('close-category-manager-btn').onclick = () => document.getElementById('category-manager-panel').classList.add('hidden');
+        document.getElementById('manage-contributors-btn').onclick = () => document.getElementById('contributor-manager-panel').classList.remove('hidden');
+        document.getElementById('close-contributor-manager-btn').onclick = () => document.getElementById('contributor-manager-panel').classList.add('hidden');
     },
 
     toggleHeatmap() {
