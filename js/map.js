@@ -1,134 +1,154 @@
-// Map management
+// Map management with MapLibre integration
 window.App = window.App || {};
 
 const { WebMercatorViewport, FlyToInterpolator } = deck;
 const { TerrainExtension } = deck;
 
 App.Map = {
-    init() {
-        const { DeckGL, MapView } = deck;
-
-        const deckgl = new DeckGL({
-            container: 'map',
-            mapStyle: 'mapbox://styles/mapbox/satellite-v9',
-            initialViewState: {
-                longitude: -95.3698,
-                latitude: 29.7604,
-                zoom: 12,
-                pitch: 0,
-                bearing: 0
-            },
-            controller: true,
-            viewState: {
-                transitionDuration: 1000,
-                transitionInterpolator: new deck.FlyToInterpolator()
-            },
-            mapboxApiAccessToken: 'pk.eyJ1IjoiZGVmYXVsdC11c2VyIiwiYSI6ImNscjB4Z2t2bjFwZWMya3FzMHV2M3M3N2cifQ.50t0m5s-s2FSp3uLwH2nhQ', // Replace with your Mapbox access token
-
-            onHover: ({object, x, y}) => {
-                const tooltip = App.state.tooltip;
-                if (object) {
-                    const feature = object;
-                    tooltip.style.left = `${x}px`;
-                    tooltip.style.top = `${y}px`;
-                    const hasObservations = feature.properties.observations && feature.properties.observations.length > 0;
-                    let labelContent = '';
-                    if (feature.properties.showLabel) {
-                        labelContent += `<span>${feature.properties.Name}</span>`;
-                    }
-                    if (hasObservations) {
-                        const highestSeverity = App.Utils.getHighestSeverity(feature.properties.observations);
-                        const color = App.Utils.getColorForSeverity(highestSeverity);
-                        const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="${color}" style="filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5));"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2V7h2v7z"/></svg>`;
-                        labelContent += iconSvg;
-                    }
-                    tooltip.innerHTML = labelContent;
-                    tooltip.style.display = 'block';
-                } else {
-                    tooltip.style.display = 'none';
-                }
-            },
-
-            onClick: ({object, x, y, coordinate}) => {
-                if (App.state.measurementMode) {
-                    App.state.measurementPoints.push(coordinate);
-                    this.renderLayers();
-                    return;
-                }
-
-                if (object) {
-                    // Close any existing popups
-                    const existingPopup = document.querySelector('.deck-popup');
-                    if (existingPopup) existingPopup.remove();
-
-                    App.Events.selectFeature(object.properties._internalId);
-                    const popup = this._createPopup(object, x, y);
-                    App.state.map.getCanvas().parentElement.appendChild(popup);
-                } else {
-                    // Close popup if clicking on the map
-                    const existingPopup = document.querySelector('.deck-popup');
-                    if (existingPopup) existingPopup.remove();
-                }
+    async init() {
+        try {
+            // Initialize MapLibre-based map controller
+            await App.MapController.init();
+            
+            // Set up deck.gl overlay with MapLibre integration
+            this.initializeDeckGLOverlay();
+            
+            App.UI.showMessage('Success', 'Map initialized successfully');
+        } catch (error) {
+            console.error('Map initialization failed:', error);
+            if (App.ErrorHandler) {
+                App.ErrorHandler.handleError({
+                    type: 'map',
+                    message: `Map initialization failed: ${error.message}`,
+                    timestamp: new Date().toISOString()
+                });
             }
-        });
-
-        App.state.map = deckgl;
-
-        // Add a tooltip element to the map container
-        const tooltip = document.createElement('div');
-        tooltip.className = 'deck-tooltip';
-        deckgl.getCanvas().parentElement.appendChild(tooltip);
-        App.state.tooltip = tooltip;
+        }
     },
 
-    _createPopup(feature, x, y) {
-        const popup = document.createElement('div');
-        popup.className = 'deck-popup';
-        popup.style.left = `${x}px`;
-        popup.style.top = `${y}px`;
-
-        const hasObservations = feature.properties.observations && feature.properties.observations.length > 0;
-        let observationBadge = hasObservations ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mr-2">Observation</span>` : '';
-
-        let content = `<strong class="text-base">${observationBadge}${feature.properties.Name || 'Unnamed Feature'}</strong><div class="text-sm mt-1 prose max-w-none">${feature.properties.Description || ''}</div>`;
-        
-        if (hasObservations) {
-            const obsSummary = feature.properties.observations.map(obs => `<li>${obs.observationType || 'General'} (${obs.severity})</li>`).join('');
-            content += `<div class="text-sm mt-2"><strong class="font-medium">Observations:</strong><ul class="list-disc list-inside">${obsSummary}</ul></div>`;
+    initializeDeckGLOverlay() {
+        if (!App.state.deckgl) {
+            console.warn('Deck.GL not available, using fallback');
+            return;
         }
 
-        popup.innerHTML = content;
+        // Set up event handlers for deck.gl
+        this.onHover = ({object, x, y}) => {
+            const tooltip = App.state.tooltip;
+            if (!tooltip) return;
 
-        const buttons = document.createElement('div');
-        buttons.className = 'mt-2 flex gap-2';
+            if (object) {
+                const feature = object;
+                tooltip.style.left = `${x}px`;
+                tooltip.style.top = `${y}px`;
+                const hasObservations = feature.properties.observations && feature.properties.observations.length > 0;
+                let labelContent = '';
+                if (feature.properties.showLabel) {
+                    labelContent += `<span>${feature.properties.Name}</span>`;
+                }
+                if (hasObservations) {
+                    const highestSeverity = App.Utils.getHighestSeverity(feature.properties.observations);
+                    const color = App.Utils.getColorForSeverity(highestSeverity);
+                    const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="${color}" style="filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5));"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2V7h2v7z"/></svg>`;
+                    labelContent += iconSvg;
+                }
+                tooltip.innerHTML = labelContent;
+                tooltip.style.display = 'block';
+            } else {
+                tooltip.style.display = 'none';
+            }
+        };
 
-        const editBtn = document.createElement('button');
-        editBtn.className = 'bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded';
-        editBtn.innerText = 'Edit Props';
-        editBtn.onclick = () => App.Events.editFeatureProperties(feature);
-        buttons.appendChild(editBtn);
+        this.onClick = ({object, x, y, coordinate}) => {
+            if (App.state.measurementMode) {
+                App.state.measurementPoints.push(coordinate);
+                this.renderLayers();
+                return;
+            }
 
-        const editShapeBtn = document.createElement('button');
-        editShapeBtn.className = 'bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded';
-        editShapeBtn.innerText = 'Edit Shape';
-        editShapeBtn.onclick = () => App.Events.editFeatureShape(feature);
-        buttons.appendChild(editShapeBtn);
+            // Close any existing popups
+            if (App.state.currentPopup) {
+                App.state.currentPopup.remove();
+                App.state.currentPopup = null;
+            }
 
-        const delBtn = document.createElement('button');
-        delBtn.className = 'bg-red-500 hover:red-600 text-white text-xs py-1 px-2 rounded';
-        delBtn.innerText = 'Delete';
-        delBtn.onclick = () => App.Events.deleteFeature(feature);
-        buttons.appendChild(delBtn);
+            if (object) {
+                App.Events.selectFeature(object.properties._internalId);
+                
+                const feature = object;
+                const popupContent = document.createElement('div');
+                popupContent.className = 'w-64'; // Set a max-width for the popup
 
-        popup.appendChild(buttons);
+                const hasObservations = feature.properties.observations && feature.properties.observations.length > 0;
+                let observationBadge = hasObservations ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mr-2">Observation</span>` : '';
 
-        const closeButton = document.createElement('button');
-        closeButton.className = 'deck-popup-close-button';
-        closeButton.innerHTML = '&times;';
-        closeButton.onclick = () => popup.remove();
-        popup.appendChild(closeButton);
+                let content = `<strong class="text-base">${observationBadge}${feature.properties.Name || 'Unnamed Feature'}</strong><div class="text-sm mt-1 prose max-w-none">${feature.properties.Description || ''}</div>`;
+                
+                if (hasObservations) {
+                    const obsSummary = feature.properties.observations.map(obs => `<li>${obs.observationType || 'General'} (${obs.severity})</li>`).join('');
+                    content += `<div class="text-sm mt-2"><strong class="font-medium">Observations:</strong><ul class="list-disc list-inside">${obsSummary}</ul></div>`;
+                }
+                popupContent.innerHTML = content;
 
-        return popup;
+                const buttons = document.createElement('div');
+                buttons.className = 'mt-2 flex gap-2';
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded';
+                editBtn.innerText = 'Edit Props';
+                editBtn.onclick = () => App.Events.editFeatureProperties(feature);
+                buttons.appendChild(editBtn);
+
+                const editShapeBtn = document.createElement('button');
+                editShapeBtn.className = 'bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded';
+                editShapeBtn.innerText = 'Edit Shape';
+                editShapeBtn.onclick = () => App.Events.editFeatureShape(feature);
+                buttons.appendChild(editShapeBtn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bg-red-500 hover:red-600 text-white text-xs py-1 px-2 rounded';
+                delBtn.innerText = 'Delete';
+                delBtn.onclick = () => App.Events.deleteFeature(feature);
+                buttons.appendChild(delBtn);
+
+                popupContent.appendChild(buttons);
+
+                App.state.currentPopup = new maplibregl.Popup({
+                    closeButton: true,
+                    closeOnClick: true,
+                    anchor: 'bottom'
+                })
+                .setLngLat(coordinate)
+                .setDOMContent(popupContent)
+                .addTo(App.state.map);
+            }
+        };
+
+        // Update deck.gl with event handlers
+        App.state.deckgl.setProps({
+            onHover: this.onHover,
+            onClick: this.onClick
+        });
+
+        // Add a tooltip element to the map container
+        if (!App.state.tooltip) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'deck-tooltip';
+            tooltip.style.cssText = `
+                position: absolute;
+                z-index: 1000;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                display: none;
+                max-width: 200px;
+            `;
+            App.state.deckgl.getCanvas().parentElement.appendChild(tooltip);
+            App.state.tooltip = tooltip;
+        }
     },
 
     renderLayers() {
@@ -228,6 +248,10 @@ App.Map = {
                     mode = null;
             }
 
+            const selectedFeatureIndexes = App.state.selectedFeatureId
+                ? featuresToRender.findIndex(f => f.properties._internalId === App.state.selectedFeatureId)
+                : -1;
+
             const editableLayer = new EditableGeoJsonLayer({
                 id: 'geojson-layer',
                 data: {
@@ -235,7 +259,7 @@ App.Map = {
                     features: featuresToRender
                 },
                 mode: mode,
-                selectedFeatureIndexes: [],
+                selectedFeatureIndexes: selectedFeatureIndexes !== -1 ? [selectedFeatureIndexes] : [],
 
                 onEdit: ({ updatedData, editType, featureIndexes }) => {
                     if (editType === 'addFeature') {
@@ -244,8 +268,28 @@ App.Map = {
                             layer: { toGeoJSON: () => newFeature }
                         });
                     } else {
-                        App.state.data.geojson.data.features = updatedData.features;
+                        const newFeatures = updatedData.features;
+                        const oldFeatures = App.state.data.geojson.data.features;
+                
+                        // Create a map for quick lookup
+                        const newFeaturesMap = new Map(newFeatures.map(f => [f.properties._internalId, f]));
+                
+                        // Update existing features and add new ones
+                        for (const newFeature of newFeatures) {
+                            const oldFeatureIndex = oldFeatures.findIndex(f => f.properties._internalId === newFeature.properties._internalId);
+                            if (oldFeatureIndex !== -1) {
+                                oldFeatures[oldFeatureIndex] = newFeature;
+                            } else {
+                                oldFeatures.push(newFeature);
+                            }
+                        }
+                
+                        // Remove deleted features
+                        App.state.data.geojson.data.features = oldFeatures.filter(f => newFeaturesMap.has(f.properties._internalId));
+                
                         App.Map.renderLayers();
+                        App.Legend.render();
+                        App.Snapshot.render();
                     }
                 },
 
@@ -255,21 +299,10 @@ App.Map = {
                 // Snapping
                 enableSnapping: true,
                 getSnapPoints: (p, { layer }) => {
-                    const snapPoints = [];
-                    const features = layer.props.data.features;
-                    for (const feature of features) {
-                        const coords = turf.getCoords(feature);
-                        for (const coord of coords) {
-                            if (Array.isArray(coord[0])) {
-                                for (const c of coord) {
-                                    snapPoints.push(c);
-                                }
-                            } else {
-                                snapPoints.push(coord);
-                            }
-                        }
-                    }
-                    return snapPoints;
+                    if (!App.state.spatialIndex) return [];
+                    const {x, y} = p;
+                    const nearbyPointIds = App.state.spatialIndex.within(x, y, 20); // 20 pixel radius
+                    return nearbyPointIds.map(id => App.state.spatialIndex.points[id].slice(0, 2));
                 },
 
                 pickable: true,

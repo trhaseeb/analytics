@@ -46,6 +46,22 @@ App.Data = {
         if (assignedDefaultCount > 0) {
             App.UI.showMessage('Import Note', `${assignedDefaultCount} feature(s) had missing or invalid categories and were assigned to the "${defaultCategoryName}" category.`);
         }
+        this.buildSpatialIndex(geojson.features);
+    },
+
+    buildSpatialIndex(features) {
+        const points = [];
+        features.forEach(feature => {
+            const coords = turf.getCoords(feature);
+            // This is a simplified approach. For proper handling, you'd need to
+            // recursively handle different geometry types (MultiPolygon, etc.)
+            if (feature.geometry.type === 'Point') {
+                points.push(coords);
+            } else if (feature.geometry.type === 'LineString' || feature.geometry.type === 'Polygon') {
+                points.push(...coords[0]);
+            }
+        });
+        App.state.spatialIndex = new KDBush(points);
     },
     addOrUpdateRasterLayer(type) {
         const data = App.state.data[type];
