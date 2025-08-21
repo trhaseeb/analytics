@@ -5,46 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Advanced Geospatial Data Viewer</title>
     
-    <!-- Tailwind CSS for styling -->
-    <!-- Using a pre-compiled, production-ready CSS file from cdnjs -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" />
     
-    <!-- deck.gl and Mapbox GL JS for mapping -->
-    <!-- Using jsDelivr CDN with pinned versions for stability -->
-    <script src="https://cdn.jsdelivr.net/npm/deck.gl@8.8.0/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/core@3.2.0/dist/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/tiles@3.2.0/dist/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@loaders.gl/las@3.2.0/dist/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@deck.gl/extensions@8.8.0/dist/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@nebula.gl/core@1.0.4/dist/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@nebula.gl/layers@1.0.4/dist/dist.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@nebula.gl/edit-modes@1.0.4/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/deck.gl@8.8.0/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/core@3.2.13/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/las@3.2.13/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/tiles@3.2.13/dist/dist.min.js"></script>
+
+    <script src="https://unpkg.com/@nebula.gl/core@1.0.4/dist/index.min.js"></script>
+    <script src="https://unpkg.com/@nebula.gl/layers@1.0.4/dist/index.min.js"></script>
+    <script src="https://unpkg.com/@nebula.gl/edit-modes@1.0.4/dist/index.min.js"></script>
+    
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
 
-    <!-- Turf.js for geospatial analysis -->
     <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
     
-    <!-- Quill WYSIWYG Editor -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" crossorigin="anonymous">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 
-    <!-- Chroma.js for color scales -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
 
-    <!-- JSZip for creating zip files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.0/jszip.min.js"></script>
 
-    <!-- PDF Export Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
     
-    <!-- Optimized Font Loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
     
-    <!-- Custom Styles -->
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body class="bg-gray-800 text-gray-100">
@@ -70,7 +60,6 @@
         </div>
     </div>
 
-    <!-- Modals and other hidden elements -->
     <div id="modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
@@ -154,7 +143,6 @@
         </div>
     </div>
 
-    <!-- JavaScript Modules -->
     <script src="js/app.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/ui.js"></script>
@@ -169,7 +157,6 @@
     <script src="js/image-annotator.js"></script>
     <script src="js/pdf-export.js"></script>
 
-    <!-- Initialize the application after all modules are loaded -->
     <script>
         window.onload = () => {
             App.init();
