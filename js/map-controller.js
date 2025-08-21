@@ -1,14 +1,16 @@
-// MapLibre Map Controller with Error Handling
+// Enhanced MapLibre Map Controller with API-Free Setup
 window.App = window.App || {};
 
 App.MapController = {
     map: null,
+    deckOverlay: null,
     fallbackInitialized: false,
     initializationAttempts: 0,
     maxInitializationAttempts: 3,
 
     async init() {
         try {
+            console.log('Initializing MapLibre with API-free tiles...');
             await this.initializeMapLibre();
         } catch (error) {
             console.error('MapLibre initialization failed:', error);
@@ -25,59 +27,106 @@ App.MapController = {
 
         const mapConfig = {
             container: 'map',
-            style: {
-                version: 8,
-                sources: {
-                    'satellite': {
-                        type: 'raster',
-                        tiles: [
-                            'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=get_your_own_OpIi9ZULNHzrESv6T2vL'
-                        ],
-                        tileSize: 256,
-                        attribution: '© MapTiler © OpenStreetMap contributors'
-                    },
-                    'osm': {
-                        type: 'raster',
-                        tiles: [
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-                        ],
-                        tileSize: 256,
-                        attribution: '© OpenStreetMap contributors'
-                    }
-                },
-                layers: [
-                    {
-                        id: 'satellite-layer',
-                        type: 'raster',
-                        source: 'satellite',
-                        minzoom: 0,
-                        maxzoom: 22
-                    }
-                ]
-            },
-            center: [-95.3698, 29.7604],
+            style: this.createAPIFreeStyle(),
+            center: [-95.3698, 29.7604], // Houston, TX
             zoom: 12,
             pitch: 0,
             bearing: 0,
             antialias: true,
-            preserveDrawingBuffer: true
+            preserveDrawingBuffer: true,
+            attributionControl: true
         };
 
         try {
             this.map = new maplibregl.Map(mapConfig);
             
             this.map.on('load', () => {
-                console.log('MapLibre map loaded successfully');
+                console.log('MapLibre map loaded successfully with API-free tiles');
                 this.addMapControls();
                 this.setupEventHandlers();
                 App.state.map = this.map;
                 
                 // Initialize deck.gl overlay
                 this.initializeDeckGLOverlay();
+                
+                // Add additional free data sources
+                this.addAlternateSources();
             });
 
             this.map.on('error', (e) => {
                 console.error('MapLibre error:', e);
+                if (this.initializationAttempts < this.maxInitializationAttempts) {
+                    console.log(`Retrying initialization (attempt ${this.initializationAttempts + 1}/${this.maxInitializationAttempts})`);
+                    setTimeout(() => this.initializeMapLibre(), 2000);
+                } else {
+                    console.log('Max attempts reached, falling back to basic map');
+                    this.initializeFallback();
+                }
+            });
+
+            return this.map;
+        } catch (error) {
+            console.error('MapLibre initialization error:', error);
+            throw error;
+        }
+    },
+
+    createAPIFreeStyle() {
+        return {
+            version: 8,
+            name: 'API-Free Style',
+            sources: {
+                'osm': {
+                    type: 'raster',
+                    tiles: [
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                    ],
+                    tileSize: 256,
+                    attribution: '© OpenStreetMap contributors',
+                    maxzoom: 19
+                },
+                'esri-satellite': {
+                    type: 'raster',
+                    tiles: [
+                        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                    ],
+                    tileSize: 256,
+                    attribution: '© Esri, Maxar, Earthstar Geographics',
+                    maxzoom: 17
+                },
+                'stamen-terrain': {
+                    type: 'raster',
+                    tiles: [
+                        'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.png'
+                    ],
+                    tileSize: 256,
+                    attribution: '© Stamen Design, © OpenStreetMap contributors',
+                    maxzoom: 18
+                },
+                'carto-light': {
+                    type: 'raster',
+                    tiles: [
+                        'https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png'
+                    ],
+                    tileSize: 256,
+                    attribution: '© CARTO, © OpenStreetMap contributors',
+                    maxzoom: 18
+                }
+            },
+            layers: [
+                {
+                    id: 'osm-base',
+                    type: 'raster',
+                    source: 'osm',
+                    minzoom: 0,
+                    maxzoom: 22,
+                    layout: {
+                        visibility: 'visible'
+                    }
+                }
+            ]
+        };
+    },
                 if (this.initializationAttempts < this.maxInitializationAttempts) {
                     setTimeout(() => this.initializeMapLibre(), 2000);
                 } else {

@@ -3,129 +3,350 @@ window.App = window.App || {};
 
 App.Events = {
     init() {
-        document.getElementById('logo-input').addEventListener('change', async e => { 
+        console.log('Initializing event handlers...');
+        
+        // Helper function to safely add event listeners
+        const safeAddEventListener = (id, event, handler) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Element with id '${id}' not found, skipping event listener`);
+            }
+        };
+
+        const safeSetOnClick = (id, handler) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.onclick = handler;
+            } else {
+                console.warn(`Element with id '${id}' not found, skipping onclick handler`);
+            }
+        };
+
+        // Logo and report info events
+        safeAddEventListener('logo-input', 'change', async e => { 
             if (e.target.files[0]) { 
                 App.state.data.logo = await App.Utils.readFile(e.target.files[0], 'dataURL'); 
-                document.getElementById('logo-img').src = App.state.data.logo; 
+                const logoImg = document.getElementById('logo-img');
+                if (logoImg) {
+                    logoImg.src = App.state.data.logo;
+                    logoImg.style.display = 'block';
+                }
             } 
         });
-        document.getElementById('logo-img').onclick = () => App.Events.showEditReportInfoModal();
-        document.getElementById('open-geodata-modal-btn').onclick = () => App.UI.elements.geodataModal.classList.remove('hidden');
-        document.getElementById('close-geodata-modal-btn').onclick = () => App.UI.elements.geodataModal.classList.add('hidden');
-        document.getElementById('ortho-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'ortho'));
-        document.getElementById('dsm-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'dsm'));
-        document.getElementById('tileset-input').addEventListener('change', e => App.Data.handleTilesetUpload(e));
-        document.getElementById('pointcloud-input').addEventListener('change', e => App.Data.handlePointCloudUpload(e));
-        document.getElementById('dtm-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'dtm'));
-        document.getElementById('import-project-input').addEventListener('change', e => App.ImportExport.importProjectOrFeatures(e));
-        document.getElementById('export-project-btn').addEventListener('click', () => App.ImportExport.showExportDataModal()); 
-        document.getElementById('add-category-btn').onclick = () => App.CategoryManager.addCategory();
-        document.getElementById('export-categories-btn').onclick = () => App.ImportExport.exportCategories();
-        document.getElementById('import-categories-input').addEventListener('change', e => App.ImportExport.importCategories(e));
-        document.getElementById('add-contributor-btn').onclick = () => App.ContributorManager.addContributor();
-        document.getElementById('show-only-with-observations-toggle').addEventListener('change', e => {
-            App.state.showOnlyWithObservations = e.target.checked;
-            App.Map.renderLayers();
+        
+        safeSetOnClick('logo-img', () => {
+            if (App.Events.showEditReportInfoModal) {
+                App.Events.showEditReportInfoModal();
+            }
         });
-        App.UI.elements.defineBoundaryBtn.onclick = () => this.startBoundaryDraw();
-        App.UI.elements.clearBoundaryBtn.onclick = () => App.Map.clearBoundary();
 
-        document.getElementById('draw-polygon-btn').onclick = () => this.setEditingMode('drawPolygon');
-        document.getElementById('draw-line-btn').onclick = () => this.setEditingMode('drawLine');
-        document.getElementById('draw-marker-btn').onclick = () => this.setEditingMode('drawMarker');
-        document.getElementById('split-polygon-btn').onclick = () => this.setEditingMode('splitPolygon');
-        document.getElementById('rotate-feature-btn').onclick = () => this.setEditingMode('rotate');
-        document.getElementById('finish-editing-btn').onclick = () => this.setEditingMode(null);
+        // Geodata modal events
+        safeSetOnClick('open-geodata-modal-btn', () => {
+            if (App.UI && App.UI.elements && App.UI.elements.geodataModal) {
+                App.UI.elements.geodataModal.classList.remove('hidden');
+            }
+        });
+        
+        safeSetOnClick('close-geodata-modal-btn', () => {
+            if (App.UI && App.UI.elements && App.UI.elements.geodataModal) {
+                App.UI.elements.geodataModal.classList.add('hidden');
+            }
+        });
 
-        document.getElementById('features-layer-toggle').onchange = (e) => this.toggleLayerVisibility('features', e.target.checked);
-        document.getElementById('ortho-layer-toggle').onchange = (e) => this.toggleLayerVisibility('ortho', e.target.checked);
-        document.getElementById('dsm-layer-toggle').onchange = (e) => this.toggleLayerVisibility('dsm', e.target.checked);
-        document.getElementById('dtm-layer-toggle').onchange = (e) => this.toggleLayerVisibility('dtm', e.target.checked);
+        // Data upload events
+        safeAddEventListener('ortho-input', 'change', e => {
+            if (App.Data && App.Data.handleRasterUpload) {
+                App.Data.handleRasterUpload(e, 'ortho');
+            }
+        });
+        
+        safeAddEventListener('dsm-input', 'change', e => {
+            if (App.Data && App.Data.handleRasterUpload) {
+                App.Data.handleRasterUpload(e, 'dsm');
+            }
+        });
+        
+        safeAddEventListener('tileset-input', 'change', e => {
+            if (App.Data && App.Data.handleTilesetUpload) {
+                App.Data.handleTilesetUpload(e);
+            }
+        });
+        
+        safeAddEventListener('pointcloud-input', 'change', e => {
+            if (App.Data && App.Data.handlePointCloudUpload) {
+                App.Data.handlePointCloudUpload(e);
+            }
+        });
+        
+        safeAddEventListener('dtm-input', 'change', e => {
+            if (App.Data && App.Data.handleRasterUpload) {
+                App.Data.handleRasterUpload(e, 'dtm');
+            }
+        });
 
-        document.getElementById('measure-distance-btn').onclick = () => this.setMeasurementMode('distance');
-        document.getElementById('measure-area-btn').onclick = () => this.setMeasurementMode('area');
-        document.getElementById('finish-measurement-btn').onclick = () => this.finishMeasurement();
-        document.getElementById('rotation-slider').oninput = (e) => this.setMapRotation(e.target.value);
-        document.getElementById('toggle-terrain-btn').onclick = () => this.toggleTerrain();
-        document.getElementById('toggle-heatmap-btn').onclick = () => this.toggleHeatmap();
-        document.getElementById('pointcloud-styling-select').onchange = (e) => this.setPointCloudStyling(e.target.value);
+        // Import/Export events
+        safeAddEventListener('import-project-input', 'change', e => {
+            if (App.ImportExport && App.ImportExport.importProjectOrFeatures) {
+                App.ImportExport.importProjectOrFeatures(e);
+            }
+        });
+        
+        safeSetOnClick('export-project-btn', () => {
+            if (App.ImportExport && App.ImportExport.showExportDataModal) {
+                App.ImportExport.showExportDataModal();
+            }
+        });
 
-        document.getElementById('open-sidebar-btn').onclick = () => document.getElementById('sidebar').classList.remove('-translate-x-full');
-        document.getElementById('close-sidebar-btn').onclick = () => document.getElementById('sidebar').classList.add('-translate-x-full');
-        document.getElementById('manage-categories-btn').onclick = () => document.getElementById('category-manager-panel').classList.remove('hidden');
-        document.getElementById('close-category-manager-btn').onclick = () => document.getElementById('category-manager-panel').classList.add('hidden');
-        document.getElementById('manage-contributors-btn').onclick = () => document.getElementById('contributor-manager-panel').classList.remove('hidden');
-        document.getElementById('close-contributor-manager-btn').onclick = () => document.getElementById('contributor-manager-panel').classList.add('hidden');
+        // Category management events
+        safeSetOnClick('add-category-btn', () => {
+            if (App.CategoryManager && App.CategoryManager.addCategory) {
+                App.CategoryManager.addCategory();
+            }
+        });
+        
+        safeSetOnClick('export-categories-btn', () => {
+            if (App.ImportExport && App.ImportExport.exportCategories) {
+                App.ImportExport.exportCategories();
+            }
+        });
+        
+        safeAddEventListener('import-categories-input', 'change', e => {
+            if (App.ImportExport && App.ImportExport.importCategories) {
+                App.ImportExport.importCategories(e);
+            }
+        });
+
+        // Contributor events
+        safeSetOnClick('add-contributor-btn', () => {
+            if (App.ContributorManager && App.ContributorManager.addContributor) {
+                App.ContributorManager.addContributor();
+            }
+        });
+
+        // Layer visibility events
+        safeAddEventListener('show-only-with-observations-toggle', 'change', e => {
+            App.state.showOnlyWithObservations = e.target.checked;
+            if (App.Map && App.Map.renderLayers) {
+                App.Map.renderLayers();
+            }
+        });
+
+        // Boundary events
+        if (App.UI && App.UI.elements) {
+            if (App.UI.elements.defineBoundaryBtn) {
+                App.UI.elements.defineBoundaryBtn.onclick = () => this.startBoundaryDraw();
+            }
+            if (App.UI.elements.clearBoundaryBtn) {
+                App.UI.elements.clearBoundaryBtn.onclick = () => {
+                    if (App.Map && App.Map.clearBoundary) {
+                        App.Map.clearBoundary();
+                    }
+                };
+            }
+        }
+
+        // Drawing tool events
+        safeSetOnClick('draw-polygon-btn', () => this.setEditingMode('drawPolygon'));
+        safeSetOnClick('draw-line-btn', () => this.setEditingMode('drawLine'));
+        safeSetOnClick('draw-marker-btn', () => this.setEditingMode('drawMarker'));
+        safeSetOnClick('split-polygon-btn', () => this.setEditingMode('splitPolygon'));
+        safeSetOnClick('rotate-feature-btn', () => this.setEditingMode('rotate'));
+        safeSetOnClick('finish-editing-btn', () => this.setEditingMode(null));
+
+        // Layer toggle events
+        const layerToggles = [
+            ['features-layer-toggle', 'features'],
+            ['ortho-layer-toggle', 'ortho'],
+            ['dsm-layer-toggle', 'dsm'],
+            ['dtm-layer-toggle', 'dtm']
+        ];
+        
+        layerToggles.forEach(([elementId, layerName]) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.onchange = (e) => this.toggleLayerVisibility(layerName, e.target.checked);
+            }
+        });
+
+        // Measurement events
+        safeSetOnClick('measure-distance-btn', () => this.setMeasurementMode('distance'));
+        safeSetOnClick('measure-area-btn', () => this.setMeasurementMode('area'));
+        safeSetOnClick('finish-measurement-btn', () => this.finishMeasurement());
+
+        // Map control events
+        const rotationSlider = document.getElementById('rotation-slider');
+        if (rotationSlider) {
+            rotationSlider.oninput = (e) => this.setMapRotation(e.target.value);
+        }
+        
+        safeSetOnClick('toggle-terrain-btn', () => this.toggleTerrain());
+        safeSetOnClick('toggle-heatmap-btn', () => this.toggleHeatmap());
+
+        // Sidebar toggle events
+        safeSetOnClick('open-sidebar-btn', () => {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.classList.remove('-translate-x-full');
+        });
+        
+        safeSetOnClick('close-sidebar-btn', () => {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.classList.add('-translate-x-full');
+        });
+
+        // Point cloud styling
+        const pointcloudSelect = document.getElementById('pointcloud-styling-select');
+        if (pointcloudSelect) {
+            pointcloudSelect.onchange = (e) => this.setPointCloudStyling(e.target.value);
+        }
+
+        // Category and contributor manager toggles
+        safeSetOnClick('manage-categories-btn', () => {
+            const panel = document.getElementById('category-manager-panel');
+            if (panel) panel.classList.remove('hidden');
+        });
+        
+        safeSetOnClick('close-category-manager-btn', () => {
+            const panel = document.getElementById('category-manager-panel');
+            if (panel) panel.classList.add('hidden');
+        });
+        
+        safeSetOnClick('manage-contributors-btn', () => {
+            const panel = document.getElementById('contributor-manager-panel');
+            if (panel) panel.classList.remove('hidden');
+        });
+        
+        safeSetOnClick('close-contributor-manager-btn', () => {
+            const panel = document.getElementById('contributor-manager-panel');
+            if (panel) panel.classList.add('hidden');
+        });
+
+        console.log('Event handlers initialized');
     },
 
     toggleHeatmap() {
+        if (!App.state.heatmap) App.state.heatmap = false;
         App.state.heatmap = !App.state.heatmap;
-        App.Map.renderLayers();
+        if (App.Map && App.Map.renderLayers) {
+            App.Map.renderLayers();
+        }
+        console.log('Heatmap toggled:', App.state.heatmap);
     },
 
     setPointCloudStyling(style) {
         App.state.pointCloudStyling = style;
-        App.Map.renderLayers();
+        if (App.Map && App.Map.renderLayers) {
+            App.Map.renderLayers();
+        }
+        console.log('Point cloud styling set to:', style);
     },
 
     toggleTerrain() {
+        if (!App.state.terrain) App.state.terrain = false;
         App.state.terrain = !App.state.terrain;
-        App.Map.renderLayers();
+        if (App.Map && App.Map.renderLayers) {
+            App.Map.renderLayers();
+        }
+        console.log('Terrain toggled:', App.state.terrain);
     },
 
     finishMeasurement() {
-        const points = App.state.measurementPoints;
-        const mode = App.state.measurementMode;
-        let measurementText = '';
+        try {
+            const points = App.state.measurementPoints || [];
+            const mode = App.state.measurementMode;
+            let measurementText = '';
 
-        if (mode === 'distance' && points.length >= 2) {
-            const line = turf.lineString(points);
-            const length = turf.length(line, { units: 'feet' });
-            measurementText = `Measured Distance: ${length.toFixed(2)} ft`;
-        } else if (mode === 'area' && points.length >= 3) {
-            const polygon = turf.polygon([points.concat([points[0]])]);
-            const area = turf.area(polygon) * 10.764; // sq meters to sq feet
-            measurementText = `Measured Area: ${area.toFixed(2)} sq ft`;
+            if (mode === 'distance' && points.length >= 2) {
+                if (typeof turf !== 'undefined') {
+                    const line = turf.lineString(points);
+                    const length = turf.length(line, { units: 'feet' });
+                    measurementText = `Measured Distance: ${length.toFixed(2)} ft`;
+                } else {
+                    measurementText = 'Distance measurement requires Turf.js library';
+                }
+            } else if (mode === 'area' && points.length >= 3) {
+                if (typeof turf !== 'undefined') {
+                    const polygon = turf.polygon([points.concat([points[0]])]);
+                    const area = turf.area(polygon) * 10.764; // sq meters to sq feet
+                    measurementText = `Measured Area: ${area.toFixed(2)} sq ft`;
+                } else {
+                    measurementText = 'Area measurement requires Turf.js library';
+                }
+            }
+
+            if (measurementText && App.UI && App.UI.showMessage) {
+                App.UI.showMessage('Measurement Result', measurementText);
+            }
+
+            this.setMeasurementMode(null);
+        } catch (error) {
+            console.error('Error finishing measurement:', error);
+            if (App.UI && App.UI.showMessage) {
+                App.UI.showMessage('Error', 'Failed to complete measurement');
+            }
         }
-
-        if (measurementText) {
-            App.UI.showMessage('Measurement Result', measurementText);
-        }
-
-        this.setMeasurementMode(null);
     },
 
     setMapRotation(bearing) {
-        App.state.map.setProps({
-            viewState: {
-                ...App.state.map.props.viewState,
-                bearing: Number(bearing),
-                transitionDuration: 300
+        try {
+            if (App.state.map && App.state.map.setProps) {
+                App.state.map.setProps({
+                    viewState: {
+                        ...App.state.map.props.viewState,
+                        bearing: Number(bearing),
+                        transitionDuration: 300
+                    }
+                });
+            } else if (App.MapController && App.MapController.map) {
+                // Fallback for MapLibre map
+                App.MapController.map.setBearing(Number(bearing));
             }
-        });
+        } catch (error) {
+            console.error('Error setting map rotation:', error);
+        }
     },
 
     setMeasurementMode(mode) {
         App.state.measurementMode = mode;
         App.state.measurementPoints = [];
-        App.Map.renderLayers();
-        document.getElementById('finish-measurement-btn').classList.toggle('hidden', mode === null);
+        if (App.Map && App.Map.renderLayers) {
+            App.Map.renderLayers();
+        }
+        const finishBtn = document.getElementById('finish-measurement-btn');
+        if (finishBtn) {
+            finishBtn.classList.toggle('hidden', mode === null);
+        }
     },
 
     toggleLayerVisibility(layer, isVisible) {
+        if (!App.state.layerVisibility) {
+            App.state.layerVisibility = {};
+        }
         App.state.layerVisibility[layer] = isVisible;
-        App.Map.renderLayers(); // This will need to be updated to render all layers
+        if (App.Map && App.Map.renderLayers) {
+            App.Map.renderLayers();
+        }
+        console.log(`Layer ${layer} visibility set to:`, isVisible);
     },
 
     setEditingMode(mode) {
         App.state.editingMode = mode;
-        App.Map.renderLayers();
-        document.getElementById('finish-editing-btn').classList.toggle('hidden', mode === null);
+        if (App.Map && App.Map.renderLayers) {
+            App.Map.renderLayers();
+        }
+        const finishBtn = document.getElementById('finish-editing-btn');
+        if (finishBtn) {
+            finishBtn.classList.toggle('hidden', mode === null);
+        }
+        console.log('Editing mode set to:', mode);
     },
 
     startBoundaryDraw() {
         this.setEditingMode('drawPolygon');
-        App.UI.showMessage('Define Boundary', 'Draw a polygon on the map to define the project boundary. Click the first point to finish.');
+        if (App.UI && App.UI.showMessage) {
+            App.UI.showMessage('Define Boundary', 'Draw a polygon on the map to define the project boundary. Click the first point to finish.');
+        }
     },
     showEditReportInfoModal() {
         const info = App.state.data.reportInfo;
