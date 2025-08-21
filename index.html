@@ -6,17 +6,21 @@
     <title>Advanced Geospatial Data Viewer</title>
     
     <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Using a pre-compiled, production-ready CSS file from cdnjs -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" />
     
     <!-- deck.gl and Mapbox GL JS for mapping -->
-    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
-    <script src="https://unpkg.com/loaders.gl@latest/dist/dist.min.js"></script>
-    <script src="https://unpkg.com/@loaders.gl/tiles/dist/dist.min.js"></script>
-    <script src="https://unpkg.com/@loaders.gl/las/dist/dist.min.js"></script>
-    <script src="https://unpkg.com/@deck.gl/extensions/dist.min.js"></script>
-    <script src="https://unpkg.com/@nebula.gl/core/dist/dist.min.js"></script>
-    <script src="https://unpkg.com/@nebula.gl/layers/dist/dist.min.js"></script>
-    <script src="https://unpkg.com/@nebula.gl/edit-modes/dist/dist.min.js"></script>
+    <!-- deck.gl and dependencies -->
+    <!-- Using unpkg CDN with pinned versions for stability -->
+    <script src="https://unpkg.com/deck.gl@8.8.0/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/core@3.2.13/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/las@3.2.13/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/tiles@3.2.13/dist/dist.min.js"></script>
+
+    <!-- nebula.gl for editable layers -->
+    <script src="https://unpkg.com/@nebula.gl/core@1.0.4/dist/index.min.js"></script>
+    <script src="https://unpkg.com/@nebula.gl/layers@1.0.4/dist/index.min.js"></script>
+    <script src="https://unpkg.com/@nebula.gl/edit-modes@1.0.4/dist/index.min.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
 
