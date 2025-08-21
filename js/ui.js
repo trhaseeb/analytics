@@ -11,6 +11,7 @@ App.UI = {
         this.elements.contributorManagerPanel = document.getElementById('contributor-manager-panel');
         this.elements.geodataModal = document.getElementById('geodata-modal');
         this.elements.editReportInfoModal = document.getElementById('edit-report-info-modal'); 
+        this.elements.reportStatusBadge = document.getElementById('report-status-badge');
         this.elements.annotationModal = document.getElementById('annotation-modal');
         this.elements.observationModal = document.getElementById('observation-modal');
         this.elements.defineBoundaryBtn = document.getElementById('define-boundary-btn');

@@ -192,12 +192,25 @@ App.Events = {
     selectFeature(featureId) {
         const feature = App.Data.getFeatureById(featureId);
         if (!feature) return;
-        const layer = App.state.featureIdToLayerMap.get(featureId);
-        if (layer) {
-            if (layer.getBounds) App.state.map.fitBounds(layer.getBounds(), { paddingTopLeft: [350, 20], paddingBottomRight: [20, 20], maxZoom: 19 });
-            else if (layer.getLatLng) App.state.map.setView(layer.getLatLng(), Math.max(App.state.map.getZoom(), 18));
-            if (layer.openPopup) layer.openPopup();
-        }
+
+        // Fly to feature
+        const [minX, minY, maxX, maxY] = turf.bbox(feature);
+        const { longitude, latitude, zoom } = new deck.WebMercatorViewport({
+            width: App.state.map.width,
+            height: App.state.map.height
+        }).fitBounds([[minX, minY], [maxX, maxY]], { padding: {top: 20, bottom: 40, left: 20, right: 20} });
+
+        App.state.map.setProps({
+            viewState: {
+                ...App.state.map.props.viewState,
+                longitude,
+                latitude,
+                zoom: Math.min(zoom, 18), // Cap zoom level
+                transitionDuration: 1000,
+                transitionInterpolator: new deck.FlyToInterpolator()
+            }
+        });
+
         document.querySelectorAll('.legend-item.selected').forEach(item => item.classList.remove('selected'));
         const listItem = document.querySelector(`.legend-item[data-feature-id="${featureId}"]`);
         if (listItem) { listItem.classList.add('selected'); listItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
@@ -329,7 +342,9 @@ App.Events = {
         }, 'observation-modal');
     },
     deleteFeature(featureToDelete) {
-        App.state.map.closePopup();
+        const existingPopup = document.querySelector('.deck-popup');
+        if (existingPopup) existingPopup.remove();
+
         App.UI.showConfirm('Delete Feature', `Are you sure you want to delete "${featureToDelete.properties.Name || 'this feature'}"?`, () => {
             App.state.data.geojson.data.features = App.state.data.geojson.data.features.filter(f => f.properties._internalId !== featureToDelete.properties._internalId);
             document.getElementById('snapshot-container').innerHTML = '<p>Select a feature from the legend or map to view its details and a visual snapshot.</p>';

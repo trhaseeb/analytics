@@ -4,84 +4,153 @@ window.App = window.App || {};
 App.Snapshot = {
     render(feature) {
         const container = document.getElementById('snapshot-container');
-        if (!feature) {
-            container.innerHTML = '<p class="p-4 text-gray-500">Select a feature to see its details.</p>';
+        if (!feature || !feature.properties) {
+            container.innerHTML = `<div class="text-center text-gray-500 p-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No Feature Selected</h3>
+                <p class="mt-1 text-sm text-gray-500">Click a feature on the map or in the legend to see its details.</p>
+            </div>`;
+            return;
+        }
+        container.innerHTML = '';
+
+        const wrapper = document.createElement('div');
+        const detailsDiv = document.createElement('div');
+        const hasObservations = feature.properties.observations && feature.properties.observations.length > 0;
+        const obsCount = hasObservations ? feature.properties.observations.length : 0;
+        let observationBadge = hasObservations ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mr-2">${obsCount} Observation${obsCount > 1 ? 's' : ''}</span>` : '';
+        detailsDiv.innerHTML = `<h3 class="text-lg font-bold text-gray-900">${observationBadge}${feature.properties.Name || 'Unnamed Feature'}</h3><div class="text-gray-600 prose max-w-none mt-2">${feature.properties.Description || '<p>No description.</p>'}</div>`;
+        wrapper.appendChild(detailsDiv);
+
+        if (hasObservations) {
+            const obsContainer = document.createElement('div');
+            obsContainer.className = 'mt-4 border-t pt-4 space-y-2';
+            obsContainer.innerHTML = `<h4 class="text-md font-bold text-gray-800 mb-2">Observations</h4>`;
+
+            feature.properties.observations.forEach(obs => {
+                const obsDiv = document.createElement('div');
+                obsDiv.className = 'border rounded-lg bg-gray-50';
+                const contributor = App.state.data.contributors.find(c => c.name === obs.contributor);
+
+                const header = document.createElement('div');
+                header.className = 'observation-header p-3 flex justify-between items-center cursor-pointer';
+                header.innerHTML = `
+                    <p class="font-bold">${obs.observationType || 'General Observation'}</p>
+                    <span class="text-xs text-gray-400">Click to expand</span>
+                `;
+
+                const details = document.createElement('div');
+                details.className = 'observation-details p-3 border-t border-gray-200 hidden';
+                let obsHTML = `
+                    <p><strong class="font-medium">Severity:</strong> ${obs.severity || 'N/A'}</p>
+                    ${contributor ? `<p><strong class="font-medium">By:</strong> ${contributor.name}</p>` : ''}
+                    <div class="prose max-w-none text-sm mt-2"><strong class="font-medium">Recommendation:</strong> ${obs.recommendation || 'N/A'}</div>
+                `;
+                details.innerHTML = obsHTML;
+
+                if (obs.images && obs.images.length > 0) {
+                    const imagesDiv = document.createElement('div');
+                    imagesDiv.className = 'mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2';
+                    obs.images.forEach(img => {
+                        const imgContainer = document.createElement('div');
+                        imgContainer.innerHTML = `
+                            <div class="snapshot-image-container">
+                                <img src="${img.src}" onerror="this.src='https://placehold.co/120x120/f87171/ffffff?text=Error'" class="rounded-md w-full h-auto shadow">
+                            </div>
+                            <p class="text-xs text-gray-500 italic text-center mt-1">${img.caption || ''}</p>
+                        `;
+                        imagesDiv.appendChild(imgContainer);
+                    });
+                    details.appendChild(imagesDiv);
+                }
+
+                obsDiv.appendChild(header);
+                obsDiv.appendChild(details);
+                obsContainer.appendChild(obsDiv);
+
+                header.onclick = () => {
+                    details.classList.toggle('hidden');
+                };
+            });
+            wrapper.appendChild(obsContainer);
+        }
+
+        const geoData = App.Utils.calculateGeoData(feature);
+        if (geoData) {
+            const geoDataDiv = document.createElement('div');
+            geoDataDiv.innerHTML = `<hr class="my-4"><h4 class="text-md font-bold text-gray-800 mb-2">Geospatial Data</h4><div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">${geoData.map(item => `<div><strong class="font-medium text-gray-600">${item.label}:</strong></div><div class="text-right">${item.value}</div>`).join('')}</div>`;
+            wrapper.appendChild(geoDataDiv);
+        }
+
+        const mapDiv = document.createElement('div');
+        mapDiv.id = 'snapshot-map';
+        mapDiv.style.height = '300px';
+        mapDiv.className = 'rounded-lg border border-gray-300 mt-4 bg-gray-50';
+        wrapper.appendChild(mapDiv);
+
+        container.appendChild(wrapper);
+
+        if (App.state.snapshotMap) App.state.snapshotMap.finalize();
+        if (!feature.geometry) {
+            mapDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">No geometry</div>';
             return;
         }
 
-        const info = `
-            <div class="p-4 border-b">
-                <h3 class="text-lg font-bold">${feature.properties.Name || 'Unnamed Feature'}</h3>
-                <p class="text-sm text-gray-600">${feature.properties.category || 'Uncategorized'}</p>
-            </div>
-            <div class="p-4 text-sm">${feature.properties.Description || 'No description.'}</div>
-        `;
+        try {
+            const { DeckGL, GeoJsonLayer, MapView } = deck;
+            const { WebMercatorViewport } = deck;
 
-        const geoData = App.Utils.calculateGeoData(feature);
-        const geoInfo = `
-            <div class="p-4 border-t">
-                <h4 class="font-semibold mb-2">Geometric Information</h4>
-                <table class="w-full text-sm">
-                    <tbody>
-                        ${geoData.map(item => `<tr><td class="font-medium pr-2">${item.label}</td><td>${item.value}</td></tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
+            const [minX, minY, maxX, maxY] = turf.bbox(feature);
+            const { longitude, latitude, zoom } = new WebMercatorViewport({
+                width: mapDiv.clientWidth,
+                height: mapDiv.clientHeight
+            }).fitBounds([[minX, minY], [maxX, maxY]], { padding: 20 });
 
-        const snapshotMap = `
-            <div class="p-4 border-t">
-                <h4 class="font-semibold mb-2">Visual Snapshot</h4>
-                <div id="snapshot-map" class="h-48 w-full bg-gray-200 rounded"></div>
-            </div>
-        `;
-
-        container.innerHTML = info + geoInfo + snapshotMap;
-
-        const [minX, minY, maxX, maxY] = turf.bbox(feature);
-        const { longitude, latitude, zoom } = new WebMercatorViewport({
-            width: 200,
-            height: 200
-        }).fitBounds([[minX, minY], [maxX, maxY]], { padding: 20 });
-
-        const snapshotDeck = new deck.DeckGL({
-            container: 'snapshot-map',
-            mapStyle: 'mapbox://styles/mapbox/satellite-v9',
-            initialViewState: {
-                longitude,
-                latitude,
-                zoom
-            },
-            controller: false,
-            mapboxApiAccessToken: 'pk.eyJ1IjoiZGVmYXVsdC11c2VyIiwiYSI6ImNscjB4Z2t2bjFwZWMya3FzMHV2M3M3N2cifQ.50t0m5s-s2FSp3uLwH2nhQ'
-        });
-
-        const layer = new deck.GeoJsonLayer({
-            id: 'snapshot-feature-layer',
-            data: feature,
-            stroked: true,
-            filled: true,
-            pointType: 'circle',
-            getFillColor: f => {
-                const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                const color = chroma(style.fillColor || '#ff8c00').rgb();
-                return [color[0], color[1], color[2], (style.fillOpacity || 0.8) * 255];
-            },
-            getLineColor: f => {
-                const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                const color = chroma(style.color || '#000000').rgb();
-                return [color[0], color[1], color[2], (style.opacity || 1) * 255];
-            },
-            getLineWidth: f => {
-                const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                return style.weight || 1;
-            },
-            getPointRadius: f => {
-                const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                return style.size ? style.size / 2 : 8;
-            }
-        });
-
-        snapshotDeck.setProps({ layers: [layer] });
+            const snapshotDeck = new DeckGL({
+                container: mapDiv,
+                mapStyle: 'mapbox://styles/mapbox/satellite-v9',
+                initialViewState: {
+                    longitude,
+                    latitude,
+                    zoom,
+                    pitch: 0,
+                    bearing: 0
+                },
+                controller: false,
+                mapboxApiAccessToken: App.state.map.props.mapboxApiAccessToken,
+                layers: [
+                    new GeoJsonLayer({
+                        id: 'snapshot-feature-layer',
+                        data: feature,
+                        pickable: false,
+                        stroked: true,
+                        filled: true,
+                        pointType: 'circle',
+                        getFillColor: f => {
+                            const style = App.CategoryManager.getCategoryStyleForFeature(f);
+                            const color = chroma(style.fillColor || '#ff8c00').rgb();
+                            return [color[0], color[1], color[2], (style.fillOpacity || 0.8) * 255];
+                        },
+                        getLineColor: f => {
+                            const style = App.CategoryManager.getCategoryStyleForFeature(f);
+                            const color = chroma(style.color || '#000000').rgb();
+                            return [color[0], color[1], color[2], (style.opacity || 1) * 255];
+                        },
+                        getLineWidth: f => {
+                            const style = App.CategoryManager.getCategoryStyleForFeature(f);
+                            return style.weight || 1;
+                        },
+                        getPointRadius: f => {
+                            const style = App.CategoryManager.getCategoryStyleForFeature(f);
+                            return style.size ? style.size / 2 : 8;
+                        }
+                    })
+                ]
+            });
+            App.state.snapshotMap = snapshotDeck;
+        } catch (e) {
+            console.error("Snapshot map error:", e);
+            mapDiv.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">Error rendering map</div>';
+        }
     }
 };
