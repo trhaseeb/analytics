@@ -6,7 +6,7 @@ App.CategoryManager = {
         if (!App.state.data.categories[categoryName]) return;
         App.state.data.categories[categoryName].styles[styleType][prop] = value;
         App.CategoryManager.updateSvgPatternDefs();
-        App.Map.renderGeoJSONLayer();
+        App.Map.renderLayers();
     }, 250),
     handleCategoryInputChange(e) {
         const target = e.target;
@@ -92,7 +92,7 @@ App.CategoryManager = {
                 App.state.data.geojson.data.features = App.state.data.geojson.data.features.filter(f => f.properties.category !== name);
                 delete App.state.data.categories[name];
                 delete App.state.categoryVisibility[name];
-                this.updateSvgPatternDefs(); this.render(); App.Map.renderGeoJSONLayer();
+                this.updateSvgPatternDefs(); this.render(); App.Map.renderLayers();
             });
         });
         document.querySelectorAll('#category-manager-content .rename-cat-btn').forEach(btn => btn.onclick = e => {
@@ -105,7 +105,7 @@ App.CategoryManager = {
                     App.state.categoryVisibility[newName] = App.state.categoryVisibility[oldName];
                     delete App.state.categoryVisibility[oldName];
                     App.state.data.geojson.data?.features.forEach(f => { if (f.properties.category === oldName) f.properties.category = newName; });
-                    this.updateSvgPatternDefs(); this.render(); App.Map.renderGeoJSONLayer();
+                    this.updateSvgPatternDefs(); this.render(); App.Map.renderLayers();
                 } else if (App.state.data.categories[newName]) App.UI.showMessage('Error', 'A category with that name already exists.');
             });
         });
@@ -137,10 +137,6 @@ App.CategoryManager = {
 
         if (geomType.includes('Polygon')) {
             style = { ...defaultStyles.polygon, ...category.styles.polygon };
-            if (style.fillPattern !== 'solid') {
-                const safeCategoryName = (feature.properties.category || '').replace(/[^a-zA-Z0-9]/g, '-');
-                style.fillColor = `url(#${style.fillPattern}-${safeCategoryName})`;
-            }
         } else if (geomType.includes('LineString')) {
             style = { ...defaultStyles.line, ...category.styles.line };
             const weight = style.weight || 1;

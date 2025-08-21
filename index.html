@@ -8,23 +8,17 @@
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Leaflet.js for mapping -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <!-- Core dependencies for GeoTIFF parsing and display -->
-    <script src="https://unpkg.com/georaster"></script>
-    <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
-    
+    <!-- deck.gl and Mapbox GL JS for mapping -->
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+    <script src="https://unpkg.com/loaders.gl@latest/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/tiles/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/@loaders.gl/las/dist/dist.min.js"></script>
+    <script src="https://unpkg.com/nebula.gl@latest/dist/bundle.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
+
     <!-- Turf.js for geospatial analysis -->
     <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
-
-    <!-- Leaflet Plugins -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.css" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" crossorigin="anonymous"/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
     
     <!-- Quill WYSIWYG Editor -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" crossorigin="anonymous">
@@ -81,8 +75,23 @@
                         <button id="open-geodata-modal-btn" class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">
                             GeoData
                         </button>
+                        <button id="draw-polygon-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Draw Polygon</button>
+                        <button id="draw-line-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Draw Line</button>
+                        <button id="draw-marker-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Draw Marker</button>
+                        <button id="split-polygon-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Split Polygon</button>
+                        <button id="rotate-feature-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Rotate Feature</button>
+                        <button id="finish-editing-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm hidden">Finish Editing</button>
+                        <button id="measure-distance-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Measure Distance</button>
+                        <button id="measure-area-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Measure Area</button>
+                        <button id="finish-measurement-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm hidden">Finish Measurement</button>
                         <button id="define-boundary-btn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Define Boundary</button>
                         <button id="clear-boundary-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm hidden">Clear Boundary</button>
+                        <div class="flex items-center gap-2">
+                            <label for="rotation-slider" class="text-sm font-medium">Rotate:</label>
+                            <input type="range" id="rotation-slider" min="-180" max="180" value="0" class="w-32">
+                        </div>
+                        <button id="toggle-terrain-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Toggle Terrain</button>
+                        <button id="toggle-heatmap-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Toggle Heatmap</button>
                     </div>
                     <!-- Group 3: Management -->
                     <div class="flex items-center gap-2">
@@ -100,6 +109,25 @@
         <!-- Map Section -->
         <div id="map-section" class="map-section">
             <div id="map"></div>
+            <div id="layer-control" class="absolute top-2 right-2 bg-white p-2 rounded shadow-lg z-10">
+                <h3 class="font-bold mb-2">Layers</h3>
+                <div class="layer-control-item">
+                    <input type="checkbox" id="features-layer-toggle" checked>
+                    <label for="features-layer-toggle">Features</label>
+                </div>
+                <div class="layer-control-item">
+                    <input type="checkbox" id="ortho-layer-toggle">
+                    <label for="ortho-layer-toggle">Orthophoto</label>
+                </div>
+                <div class="layer-control-item">
+                    <input type="checkbox" id="dsm-layer-toggle">
+                    <label for="dsm-layer-toggle">DSM</label>
+                </div>
+                <div class="layer-control-item">
+                    <input type="checkbox" id="dtm-layer-toggle">
+                    <label for="dtm-layer-toggle">DTM</label>
+                </div>
+            </div>
             <div class="p-4 text-sm text-gray-500 bg-gray-50 rounded-b-xl">
                 <p>Interactive map showing raster layers and vector features. Use the layer control in the top right to toggle visibility. Measurement and drawing tools are on the left.</p>
             </div>
@@ -163,6 +191,27 @@
                         Upload Digital Surface Model (DSM)
                         <input type="file" id="dsm-input" class="hidden" accept=".tif,.tiff">
                     </label>
+                    <label for="tileset-input" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm cursor-pointer mt-2">
+                        Upload 3D Tileset
+                        <input type="file" id="tileset-input" class="hidden" accept=".json">
+                    </label>
+                    <label for="pointcloud-input" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm cursor-pointer mt-2">
+                        Upload Point Cloud
+                        <input type="file" id="pointcloud-input" class="hidden" accept=".las,.laz">
+                    </label>
+                    <label for="dtm-input" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm cursor-pointer mt-2">
+                        Upload Digital Terrain Model (DTM)
+                        <input type="file" id="dtm-input" class="hidden" accept=".tif,.tiff">
+                    </label>
+                </div>
+                <div class="modal-section">
+                    <h4>Point Cloud Styling</h4>
+                    <select id="pointcloud-styling-select" class="w-full p-2 border rounded">
+                        <option value="none">None</option>
+                        <option value="classification">Color by Classification</option>
+                        <option value="intensity">Color by Intensity</option>
+                        <option value="elevation">Color by Elevation</option>
+                    </select>
                 </div>
             </div>
             <div class="flex justify-end mt-6">
