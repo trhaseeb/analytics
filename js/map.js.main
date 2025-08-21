@@ -2,7 +2,7 @@
 window.App = window.App || {};
 
 const { WebMercatorViewport, FlyToInterpolator } = deck;
-const { TerrainExtension } = deck;
+const { TerrainExtension } = deck_extensions;
 
 App.Map = {
     init() {
@@ -91,7 +91,7 @@ App.Map = {
         let observationBadge = hasObservations ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mr-2">Observation</span>` : '';
 
         let content = `<strong class="text-base">${observationBadge}${feature.properties.Name || 'Unnamed Feature'}</strong><div class="text-sm mt-1 prose max-w-none">${feature.properties.Description || ''}</div>`;
-        
+
         if (hasObservations) {
             const obsSummary = feature.properties.observations.map(obs => `<li>${obs.observationType || 'General'} (${obs.severity})</li>`).join('');
             content += `<div class="text-sm mt-2"><strong class="font-medium">Observations:</strong><ul class="list-disc list-inside">${obsSummary}</ul></div>`;
@@ -133,10 +133,11 @@ App.Map = {
 
     renderLayers() {
         const layers = [];
-        const { GeoJsonLayer, TerrainLayer, HeatmapLayer } = deck;
-        const { MaskExtension } = deck;
+        const { GeoJsonLayer, TerrainLayer } = deck;
+        const { MaskExtension } = deck_extensions;
 
         if (App.state.heatmap) {
+            const { HeatmapLayer } = deck_aggregation;
             const observationPoints = App.state.data.geojson.data.features.flatMap(f =>
                 (f.properties.observations || []).map(o => ({
                     coordinates: f.geometry.coordinates,
@@ -453,7 +454,7 @@ App.Map = {
                 }
             });
         }
-        
+
         App.UI.elements.defineBoundaryBtn.classList.add('hidden');
         App.UI.elements.clearBoundaryBtn.classList.remove('hidden');
     },
@@ -473,7 +474,7 @@ App.Map = {
 
         const div = document.createElement('div');
         div.className = 'pointcloud-legend absolute bottom-2 left-2 bg-white p-2 rounded shadow-lg z-10';
-        
+
         let legendHtml = `<div class="font-bold mb-2">Point Cloud Legend</div>`;
 
         if (styling === 'classification') {

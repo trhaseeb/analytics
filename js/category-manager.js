@@ -151,35 +151,42 @@ App.CategoryManager = {
         }
         return style;
     },
-    // Legacy Leaflet function - no longer used with deck.gl
-    // Point styling is now handled in map.js getFillColor, getLineColor, getPointRadius functions
     createPointMarker(feature, latlng) {
-        console.warn('createPointMarker is deprecated - styling is now handled in deck.gl layer properties');
-        return null;
+        const style = this.getCategoryStyleForFeature(feature);
+        if (style.shape === 'svg' && style.svg) {
+            try {
+                const size = style.svgSize || 32;
+                const iconHtml = `<div style="opacity: ${style.fillOpacity};">${style.svg.replace(/currentColor/g, style.fillColor)}</div>`;
+                // Basic validation
+                if (!iconHtml.includes('<svg')) throw new Error("Invalid SVG content");
+                return L.marker(latlng, { icon: L.divIcon({ html: iconHtml, className: 'custom-svg-icon', iconSize: [size, size], iconAnchor: [size/2, size/2] }) });
+            } catch (e) {
+                console.error("Failed to render custom SVG icon, falling back to default.", e);
+                // Fallback to a default circle marker if SVG rendering fails
+                return L.circleMarker(latlng, { ...style, radius: (style.size || 16)/2 });
+            }
+        }
+        const size = style.size || 16;
+        if (style.shape === 'square') {
+            const iconHtml = `<div style="background-color:${style.fillColor}; opacity: ${style.fillOpacity}; border: ${style.weight}px solid ${style.color}; width:${size}px;height:${size}px;border-radius:2px;"></div>`;
+            return L.marker(latlng, { icon: L.divIcon({ html: iconHtml, className: 'leaflet-square-icon', iconSize: [size, size], iconAnchor: [size/2, size/2] }) });
+        }
+        if (style.shape === 'triangle') {
+            const iconHtml = `<svg viewbox="0 0 24 24" width="${size}" height="${size}" style="opacity: ${style.fillOpacity};"><path d="M12 2 L2 22 L22 22 Z" fill="${style.fillColor}" stroke="${style.color}" stroke-width="${style.weight*24/size}"></path></svg>`;
+            return L.marker(latlng, { icon: L.divIcon({ html: iconHtml, className: 'custom-svg-icon', iconSize: [size, size], iconAnchor: [size/2, size*0.9] }) });
+        }
+        return L.circleMarker(latlng, { ...style, radius: size/2 });
     },
     updateSvgPatternDefs() {
         const defsEl = App.state.svgPatternDefs;
-        if (!defsEl) {
-            // Create SVG defs element if it doesn't exist
-            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.style.position = 'absolute';
-            svg.style.width = '0';
-            svg.style.height = '0';
-            svg.style.visibility = 'hidden';
-            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            svg.appendChild(defs);
-            document.body.appendChild(svg);
-            App.state.svgPatternDefs = defs;
-            return this.updateSvgPatternDefs(); // Call again now that element exists
-        }
-        
+        if (!defsEl) return;
         defsEl.innerHTML = '';
         for (const categoryName in App.state.data.categories) {
             const style = App.state.data.categories[categoryName].styles.polygon;
             const pattern = style.fillPattern;
             if (pattern !== 'solid') {
                 const safeCategoryName = categoryName.replace(/[^a-zA-Z0-9]/g, '-');
-                const p = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+                const p = L.SVG.create('pattern');
                 p.setAttribute('id', `${pattern}-${safeCategoryName}`);
                 p.setAttribute('patternUnits', 'userSpaceOnUse');
                 const size = style.patternDensity || 10;
@@ -192,51 +199,15 @@ App.CategoryManager = {
                 const strokeWidth = Math.max(1, size / 8);
                 const color = style.fillColor;
                 switch (pattern) {
-                    case 'h-lines': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M 0 ${size/2} L ${size} ${size/2}`); 
-                        break;
-                    case 'v-lines': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M ${size/2} 0 L ${size/2} ${size}`); 
-                        break;
-                    case 'diag-lines': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M 0 ${size} L ${size} 0`); 
-                        break;
-                    case 'crosshatch': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M 0 ${size/2} L ${size} ${size/2} M ${size/2} 0 L ${size/2} ${size}`); 
-                        break;
-                    case 'dots': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); 
-                        shape.setAttribute('cx', size/2); 
-                        shape.setAttribute('cy', size/2); 
-                        shape.setAttribute('r', Math.max(1, size/5)); 
-                        break;
-                    case 'squares': 
-                        const sqSize = Math.max(2, size/2); 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); 
-                        shape.setAttribute('x', (size-sqSize)/2); 
-                        shape.setAttribute('y', (size-sqSize)/2); 
-                        shape.setAttribute('width', sqSize); 
-                        shape.setAttribute('height', sqSize); 
-                        break;
-                    case 'triangles': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M${size/2} 0 L${size} ${size} L0 ${size} Z`); 
-                        break;
-                    case 'hexagons': 
-                        const h = size * 0.866; 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M${size/2} 0 L${size} ${h/4} L${size} ${h*3/4} L${size/2} ${h} L0 ${h*3/4} L0 ${h/4} Z`); 
-                        p.setAttribute('height', h); 
-                        break;
-                    case 'wave': 
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); 
-                        shape.setAttribute('d', `M 0 ${size/2} C ${size/4} 0, ${size*3/4} ${size}, ${size} ${size/2}`); 
-                        shape.setAttribute('fill', 'transparent'); 
-                        break;
+                    case 'h-lines': shape = L.SVG.create('path'); shape.setAttribute('d', `M 0 ${size/2} L ${size} ${size/2}`); break;
+                    case 'v-lines': shape = L.SVG.create('path'); shape.setAttribute('d', `M ${size/2} 0 L ${size/2} ${size}`); break;
+                    case 'diag-lines': shape = L.SVG.create('path'); shape.setAttribute('d', `M 0 ${size} L ${size} 0`); break;
+                    case 'crosshatch': shape = L.SVG.create('path'); shape.setAttribute('d', `M 0 ${size/2} L ${size} ${size/2} M ${size/2} 0 L ${size/2} ${size}`); break;
+                    case 'dots': shape = L.SVG.create('circle'); shape.setAttribute('cx', size/2); shape.setAttribute('cy', size/2); shape.setAttribute('r', Math.max(1, size/5)); break;
+                    case 'squares': const sqSize = Math.max(2, size/2); shape = L.SVG.create('rect'); shape.setAttribute('x', (size-sqSize)/2); shape.setAttribute('y', (size-sqSize)/2); shape.setAttribute('width', sqSize); shape.setAttribute('height', sqSize); break;
+                    case 'triangles': shape = L.SVG.create('path'); shape.setAttribute('d', `M${size/2} 0 L${size} ${size} L0 ${size} Z`); break;
+                    case 'hexagons': const h = size * 0.866; shape = L.SVG.create('path'); shape.setAttribute('d', `M${size/2} 0 L${size} ${h/4} L${size} ${h*3/4} L${size/2} ${h} L0 ${h*3/4} L0 ${h/4} Z`); p.setAttribute('height', h); break;
+                    case 'wave': shape = L.SVG.create('path'); shape.setAttribute('d', `M 0 ${size/2} C ${size/4} 0, ${size*3/4} ${size}, ${size} ${size/2}`); shape.setAttribute('fill', 'transparent'); break;
                 }
                 if (shape) {
                     if (pattern.includes('lines') || pattern === 'crosshatch' || pattern === 'wave') { 
@@ -244,8 +215,7 @@ App.CategoryManager = {
                         shape.setAttribute('stroke-width', strokeWidth); 
                     }
                     else { shape.setAttribute('fill', color); }
-                    p.appendChild(shape); 
-                    defsEl.appendChild(p);
+                    p.appendChild(shape); defsEl.appendChild(p);
                 }
             }
         }
