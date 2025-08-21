@@ -2,7 +2,6 @@
 window.App = window.App || {};
 
 const { WebMercatorViewport, FlyToInterpolator } = deck;
-const { TerrainExtension } = deck;
 
 App.Map = {
     init() {
@@ -133,10 +132,11 @@ App.Map = {
 
     renderLayers() {
         const layers = [];
-        const { GeoJsonLayer, TerrainLayer, HeatmapLayer } = deck;
-        const { MaskExtension } = deck;
+        const { GeoJsonLayer, TerrainLayer } = deck;
+        const { MaskExtension } = deck_extensions;
 
         if (App.state.heatmap) {
+            const { HeatmapLayer } = deck_aggregation;
             const observationPoints = App.state.data.geojson.data.features.flatMap(f =>
                 (f.properties.observations || []).map(o => ({
                     coordinates: f.geometry.coordinates,
@@ -249,7 +249,7 @@ App.Map = {
                     }
                 },
 
-                extensions: [new MaskExtension(), new deck.TerrainExtension()],
+                extensions: [new MaskExtension(), new deck_extensions.TerrainExtension()],
                 maskId: 'boundary-layer',
 
                 // Snapping
@@ -373,7 +373,7 @@ App.Map = {
                 minZoom: 0,
                 maxZoom: 19,
                 tileSize: 256,
-                extensions: [new TerrainExtension()],
+                extensions: [new deck_extensions.TerrainExtension()],
                 renderSubLayers: props => {
                     const { west, south, east, north } = props.tile.bbox;
                     return new BitmapLayer(props, {
@@ -391,7 +391,7 @@ App.Map = {
                 minZoom: 0,
                 maxZoom: 19,
                 tileSize: 256,
-                extensions: [new TerrainExtension()],
+                extensions: [new deck_extensions.TerrainExtension()],
                 renderSubLayers: props => {
                     const { west, south, east, north } = props.tile.bbox;
                     return new BitmapLayer(props, {
@@ -409,7 +409,7 @@ App.Map = {
                 minZoom: 0,
                 maxZoom: 19,
                 tileSize: 256,
-                extensions: [new TerrainExtension()],
+                extensions: [new deck_extensions.TerrainExtension()],
                 renderSubLayers: props => {
                     const { west, south, east, north } = props.tile.bbox;
                     return new BitmapLayer(props, {
