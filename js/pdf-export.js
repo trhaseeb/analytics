@@ -10,7 +10,7 @@ App.PDFExport = {
         mapScale: 3,
         paddingMM: 15,
         // MODIFICATION: New configuration property for map zoom level
-        mapFitPadding: 0.05, // Lower value means more zoomed in. 0.1 is default leaflet behavior.
+        mapFitPadding: 0.05, // Lower value means more zoomed in. 0.1 is default deck.gl behavior.
     },
 
     // Utility helpers
