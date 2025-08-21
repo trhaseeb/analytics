@@ -3,11 +3,11 @@ window.App = window.App || {};
 
 App.Events = {
     init() {
-        document.getElementById('logo-input').addEventListener('change', async e => { 
-            if (e.target.files[0]) { 
-                App.state.data.logo = await App.Utils.readFile(e.target.files[0], 'dataURL'); 
-                document.getElementById('logo-img').src = App.state.data.logo; 
-            } 
+        document.getElementById('logo-input').addEventListener('change', async e => {
+            if (e.target.files[0]) {
+                App.state.data.logo = await App.Utils.readFile(e.target.files[0], 'dataURL');
+                document.getElementById('logo-img').src = App.state.data.logo;
+            }
         });
         document.getElementById('logo-img').onclick = () => App.Events.showEditReportInfoModal();
         document.getElementById('open-geodata-modal-btn').onclick = () => App.UI.elements.geodataModal.classList.remove('hidden');
@@ -18,10 +18,14 @@ App.Events = {
         document.getElementById('pointcloud-input').addEventListener('change', e => App.Data.handlePointCloudUpload(e));
         document.getElementById('dtm-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'dtm'));
         document.getElementById('import-project-input').addEventListener('change', e => App.ImportExport.importProjectOrFeatures(e));
-        document.getElementById('export-project-btn').addEventListener('click', () => App.ImportExport.showExportDataModal()); 
+        document.getElementById('export-project-btn').addEventListener('click', () => App.ImportExport.showExportDataModal());
+        document.getElementById('manage-categories-btn').onclick = () => App.UI.elements.categoryManagerPanel.classList.add('open');
+        document.getElementById('close-category-manager-btn').onclick = () => App.UI.elements.categoryManagerPanel.classList.remove('open');
         document.getElementById('add-category-btn').onclick = () => App.CategoryManager.addCategory();
         document.getElementById('export-categories-btn').onclick = () => App.ImportExport.exportCategories();
         document.getElementById('import-categories-input').addEventListener('change', e => App.ImportExport.importCategories(e));
+        document.getElementById('manage-contributors-btn').onclick = () => App.UI.elements.contributorManagerPanel.classList.add('open');
+        document.getElementById('close-contributor-manager-btn').onclick = () => App.UI.elements.contributorManagerPanel.classList.remove('open');
         document.getElementById('add-contributor-btn').onclick = () => App.ContributorManager.addContributor();
         document.getElementById('show-only-with-observations-toggle').addEventListener('change', e => {
             App.state.showOnlyWithObservations = e.target.checked;
@@ -49,13 +53,6 @@ App.Events = {
         document.getElementById('toggle-terrain-btn').onclick = () => this.toggleTerrain();
         document.getElementById('toggle-heatmap-btn').onclick = () => this.toggleHeatmap();
         document.getElementById('pointcloud-styling-select').onchange = (e) => this.setPointCloudStyling(e.target.value);
-
-        document.getElementById('open-sidebar-btn').onclick = () => document.getElementById('sidebar').classList.remove('-translate-x-full');
-        document.getElementById('close-sidebar-btn').onclick = () => document.getElementById('sidebar').classList.add('-translate-x-full');
-        document.getElementById('manage-categories-btn').onclick = () => document.getElementById('category-manager-panel').classList.remove('hidden');
-        document.getElementById('close-category-manager-btn').onclick = () => document.getElementById('category-manager-panel').classList.add('hidden');
-        document.getElementById('manage-contributors-btn').onclick = () => document.getElementById('contributor-manager-panel').classList.remove('hidden');
-        document.getElementById('close-contributor-manager-btn').onclick = () => document.getElementById('contributor-manager-panel').classList.add('hidden');
     },
 
     toggleHeatmap() {
@@ -142,15 +139,15 @@ App.Events = {
             { id: 'clientAddress', label: 'Client Address', value: info.clientAddress, type: 'text' },
             { id: 'projectId', label: 'Project ID', value: info.projectId, type: 'text' },
             { id: 'reportDate', label: 'Report Date', value: App.Utils.formatDate(info.reportDate || new Date()), type: 'date' },
-            { id: 'reportStatus', label: 'Report Status', value: info.reportStatus, type: 'select', 
+            { id: 'reportStatus', label: 'Report Status', value: info.reportStatus, type: 'select',
                 options: [{label:'Draft',value:'Draft'},{label:'Under Review',value:'Under Review'},{label:'Final',value:'Final'},{label:'Archived',value:'Archived'}] }
-        ], async (results) => { 
+        ], async (results) => {
             if (results.newTitle) {
                 titleElement.childNodes[0].nodeValue = results.newTitle + ' ';
             }
             if (results.Description) descriptionElement.innerHTML = results.Description;
-            
-            if (results.logoFile) { 
+
+            if (results.logoFile) {
                 App.state.data.logo = await App.Utils.readFile(results.logoFile, 'dataURL');
                 document.getElementById('logo-img').src = App.state.data.logo;
             }
@@ -160,19 +157,19 @@ App.Events = {
                 projectId: results.projectId, reportDate: results.reportDate, reportStatus: results.reportStatus
             };
             App.UI.updateReportStatusDisplay();
-        }, 'edit-report-info-modal'); 
+        }, 'edit-report-info-modal');
     },
     handleDrawNewFeature(e) {
         // Ignore if this was a boundary draw
         if (App.state.boundaryDrawer) return;
 
         const categoryOptions = Object.keys(App.state.data.categories).map(name => ({ label: name, value: name }));
-        if (categoryOptions.length === 0) { 
-            App.UI.showMessage('No Categories', 'Please create a category first using the "Manage Categories" button.'); 
+        if (categoryOptions.length === 0) {
+            App.UI.showMessage('No Categories', 'Please create a category first using the "Manage Categories" button.');
             App.state.map.removeLayer(e.layer);
-            return; 
+            return;
         }
-        
+
         const newFeature = e.layer.toGeoJSON();
         App.UI.showPrompt('New Feature Details', [
             { id: 'Name', label: 'Name', value: 'New Feature', type: 'text' },
@@ -181,7 +178,7 @@ App.Events = {
             { id: 'showLabel', label: 'Show Label on Map', value: true, type: 'checkbox' },
         ], (results) => {
             newFeature.properties = results;
-            newFeature.properties._internalId = crypto.randomUUID(); 
+            newFeature.properties._internalId = crypto.randomUUID();
             newFeature.properties.observations = [];
             if (!App.state.data.geojson.data) App.state.data.geojson.data = { type: 'FeatureCollection', features: [] };
             App.state.data.geojson.data.features.push(newFeature);
@@ -205,7 +202,7 @@ App.Events = {
     },
     editFeatureProperties(feature) {
         App.state.map.closePopup();
-        
+
         const fields = [
             { id: 'Name', label: 'Name', value: feature.properties.Name || '', type: 'text' },
             { id: 'Description', label: 'Description', value: feature.properties.Description || '', type: 'quill' },

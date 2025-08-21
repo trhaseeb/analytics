@@ -4,6 +4,7 @@ window.App = window.App || {};
 App.UI = {
     elements: {}, 
     init() {
+        // The report-status-badge was part of the old UI and has been removed in the redesign.
         this.elements.modal = document.getElementById('modal'); 
         this.elements.loader = document.getElementById('loader');
         this.elements.loaderText = document.getElementById('loader-text');
