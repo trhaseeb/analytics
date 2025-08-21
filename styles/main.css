@@ -137,3 +137,39 @@ body {
     fill-opacity: 0.05;
     pointer-events: none; /* Allows clicks to pass through */
 }
+
+.deck-tooltip {
+    position: absolute;
+    background: white;
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    pointer-events: none;
+    z-index: 1001;
+    font-size: 12px;
+    max-width: 300px;
+}
+
+.deck-popup {
+    position: absolute;
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 1000;
+    font-size: 14px;
+    max-width: 320px;
+    transform: translate(-50%, -100%);
+    margin-top: -10px;
+}
+
+.deck-popup-close-button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+}
