@@ -449,7 +449,7 @@ App.Map = {
                     latitude,
                     zoom,
                     transitionDuration: 1000,
-                    transitionInterpolator: new FlyToInterpolator()
+                    transitionInterpolator: new deck.FlyToInterpolator()
                 }
             });
         }
