@@ -2,9 +2,6 @@
 window.App = window.App || {};
 
 App.Events = {
-    activeEditor: null,
-    activeLayer: null,
-    finishControlInstance: null,
     init() {
         document.getElementById('logo-input').addEventListener('change', async e => { 
             if (e.target.files[0]) { 
@@ -17,6 +14,9 @@ App.Events = {
         document.getElementById('close-geodata-modal-btn').onclick = () => App.UI.elements.geodataModal.classList.add('hidden');
         document.getElementById('ortho-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'ortho'));
         document.getElementById('dsm-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'dsm'));
+        document.getElementById('tileset-input').addEventListener('change', e => App.Data.handleTilesetUpload(e));
+        document.getElementById('pointcloud-input').addEventListener('change', e => App.Data.handlePointCloudUpload(e));
+        document.getElementById('dtm-input').addEventListener('change', e => App.Data.handleRasterUpload(e, 'dtm'));
         document.getElementById('import-project-input').addEventListener('change', e => App.ImportExport.importProjectOrFeatures(e));
         document.getElementById('export-project-btn').addEventListener('click', () => App.ImportExport.showExportDataModal()); 
         document.getElementById('manage-categories-btn').onclick = () => App.UI.elements.categoryManagerPanel.classList.add('open');
@@ -29,32 +29,100 @@ App.Events = {
         document.getElementById('add-contributor-btn').onclick = () => App.ContributorManager.addContributor();
         document.getElementById('show-only-with-observations-toggle').addEventListener('change', e => {
             App.state.showOnlyWithObservations = e.target.checked;
-            App.Map.renderGeoJSONLayer(); 
+            App.Map.renderLayers();
         });
         App.UI.elements.defineBoundaryBtn.onclick = () => this.startBoundaryDraw();
         App.UI.elements.clearBoundaryBtn.onclick = () => App.Map.clearBoundary();
-    },
-    startBoundaryDraw() {
-        App.UI.showMessage('Define Boundary', 'Draw a polygon on the map to define the project boundary. Click the first point to finish.');
-        App.state.boundaryDrawer = new L.Draw.Polygon(App.state.map, {
-            allowIntersection: false,
-            showArea: true,
-            shapeOptions: {
-                color: '#0ea5e9',
-                weight: 3,
-            }
-        });
-        App.state.boundaryDrawer.enable();
 
-        App.state.map.once(L.Draw.Event.CREATED, (e) => {
-            const layer = e.layer;
-            // When user draws a boundary, zoom to it
-            App.Map.setBoundary(layer.toGeoJSON(), true);
-            if (App.state.boundaryDrawer) {
-                App.state.boundaryDrawer.disable();
-                App.state.boundaryDrawer = null;
+        document.getElementById('draw-polygon-btn').onclick = () => this.setEditingMode('drawPolygon');
+        document.getElementById('draw-line-btn').onclick = () => this.setEditingMode('drawLine');
+        document.getElementById('draw-marker-btn').onclick = () => this.setEditingMode('drawMarker');
+        document.getElementById('split-polygon-btn').onclick = () => this.setEditingMode('splitPolygon');
+        document.getElementById('rotate-feature-btn').onclick = () => this.setEditingMode('rotate');
+        document.getElementById('finish-editing-btn').onclick = () => this.setEditingMode(null);
+
+        document.getElementById('features-layer-toggle').onchange = (e) => this.toggleLayerVisibility('features', e.target.checked);
+        document.getElementById('ortho-layer-toggle').onchange = (e) => this.toggleLayerVisibility('ortho', e.target.checked);
+        document.getElementById('dsm-layer-toggle').onchange = (e) => this.toggleLayerVisibility('dsm', e.target.checked);
+        document.getElementById('dtm-layer-toggle').onchange = (e) => this.toggleLayerVisibility('dtm', e.target.checked);
+
+        document.getElementById('measure-distance-btn').onclick = () => this.setMeasurementMode('distance');
+        document.getElementById('measure-area-btn').onclick = () => this.setMeasurementMode('area');
+        document.getElementById('finish-measurement-btn').onclick = () => this.finishMeasurement();
+        document.getElementById('rotation-slider').oninput = (e) => this.setMapRotation(e.target.value);
+        document.getElementById('toggle-terrain-btn').onclick = () => this.toggleTerrain();
+        document.getElementById('toggle-heatmap-btn').onclick = () => this.toggleHeatmap();
+        document.getElementById('pointcloud-styling-select').onchange = (e) => this.setPointCloudStyling(e.target.value);
+    },
+
+    toggleHeatmap() {
+        App.state.heatmap = !App.state.heatmap;
+        App.Map.renderLayers();
+    },
+
+    setPointCloudStyling(style) {
+        App.state.pointCloudStyling = style;
+        App.Map.renderLayers();
+    },
+
+    toggleTerrain() {
+        App.state.terrain = !App.state.terrain;
+        App.Map.renderLayers();
+    },
+
+    finishMeasurement() {
+        const points = App.state.measurementPoints;
+        const mode = App.state.measurementMode;
+        let measurementText = '';
+
+        if (mode === 'distance' && points.length >= 2) {
+            const line = turf.lineString(points);
+            const length = turf.length(line, { units: 'feet' });
+            measurementText = `Measured Distance: ${length.toFixed(2)} ft`;
+        } else if (mode === 'area' && points.length >= 3) {
+            const polygon = turf.polygon([points.concat([points[0]])]);
+            const area = turf.area(polygon) * 10.764; // sq meters to sq feet
+            measurementText = `Measured Area: ${area.toFixed(2)} sq ft`;
+        }
+
+        if (measurementText) {
+            App.UI.showMessage('Measurement Result', measurementText);
+        }
+
+        this.setMeasurementMode(null);
+    },
+
+    setMapRotation(bearing) {
+        App.state.map.setProps({
+            viewState: {
+                ...App.state.map.props.viewState,
+                bearing: Number(bearing),
+                transitionDuration: 300
             }
         });
+    },
+
+    setMeasurementMode(mode) {
+        App.state.measurementMode = mode;
+        App.state.measurementPoints = [];
+        App.Map.renderLayers();
+        document.getElementById('finish-measurement-btn').classList.toggle('hidden', mode === null);
+    },
+
+    toggleLayerVisibility(layer, isVisible) {
+        App.state.layerVisibility[layer] = isVisible;
+        App.Map.renderLayers(); // This will need to be updated to render all layers
+    },
+
+    setEditingMode(mode) {
+        App.state.editingMode = mode;
+        App.Map.renderLayers();
+        document.getElementById('finish-editing-btn').classList.toggle('hidden', mode === null);
+    },
+
+    startBoundaryDraw() {
+        this.setEditingMode('drawPolygon');
+        App.UI.showMessage('Define Boundary', 'Draw a polygon on the map to define the project boundary. Click the first point to finish.');
     },
     showEditReportInfoModal() {
         const info = App.state.data.reportInfo;
@@ -114,21 +182,9 @@ App.Events = {
             newFeature.properties.observations = [];
             if (!App.state.data.geojson.data) App.state.data.geojson.data = { type: 'FeatureCollection', features: [] };
             App.state.data.geojson.data.features.push(newFeature);
-            App.Map.renderGeoJSONLayer(); 
+            App.Map.renderLayers();
             App.Events.selectFeature(newFeature.properties._internalId);
         });
-    },
-    handleFeaturesEdited(e) {
-        e.layers.eachLayer(layer => {
-            const feature = App.Data.getFeatureById(layer.feature_internal_id);
-            if (feature) { 
-                feature.geometry = layer.toGeoJSON().geometry; 
-                App.Map.updateFeatureDecorator(layer); 
-            }
-        });
-        const selected = document.querySelector('.legend-item.selected');
-        if (selected) { App.Snapshot.render(App.Data.getFeatureById(selected.dataset.featureId)); }
-        App.Map.renderGeoJSONLayer(); 
     },
     selectFeature(featureId) {
         const feature = App.Data.getFeatureById(featureId);
@@ -156,7 +212,7 @@ App.Events = {
 
         App.UI.showPrompt('Edit Feature', fields, (results) => {
             Object.assign(feature.properties, results);
-            App.Map.renderGeoJSONLayer(); 
+            App.Map.renderLayers();
             this.selectFeature(feature.properties._internalId);
         });
 
@@ -173,62 +229,27 @@ App.Events = {
             this.showObservationModal(feature);
         };
     },
-    editFeatureShape(layer) {
-        if (this.activeEditor) {
-            this.finishEditing(); // Finish any previous edit before starting a new one
-        }
-        App.state.map.closePopup();
-        layer.editing.enable();
-        this.activeEditor = layer.editing;
-        this.activeLayer = layer;
-        this.showFinishEditingControl();
-    },
-    showFinishEditingControl() {
-        if (this.finishControlInstance) return; // Already showing
+    editFeatureShape(feature) {
+        this.setEditingMode('edit');
 
-        const FinishControl = L.Control.extend({
-            onAdd: map => {
-                const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-                container.style.background = 'white';
-                container.style.padding = '5px';
-                container.innerHTML = '<button id="finish-edit-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-2 rounded-md text-sm">Finish Editing</button>';
-                L.DomEvent.disableClickPropagation(container);
-                L.DomEvent.on(container.querySelector('#finish-edit-btn'), 'click', () => {
-                    App.Events.finishEditing();
-                });
-                return container;
+        const featureIndex = App.state.data.geojson.data.features.findIndex(
+            f => f.properties._internalId === feature.properties._internalId
+        );
+
+        if (featureIndex !== -1) {
+            const layer = App.state.map.props.layers.find(l => l.id === 'geojson-layer');
+            if (layer) {
+                const newProps = {
+                    ...layer.props,
+                    selectedFeatureIndexes: [featureIndex]
+                };
+                const newLayer = new nebula.EditableGeoJsonLayer(newProps);
+                App.state.map.setProps({ layers: [newLayer] });
             }
-        });
-        this.finishControlInstance = new FinishControl({ position: 'topright' }).addTo(App.state.map);
+        }
     },
     finishEditing() {
-        if (!this.activeEditor) return;
-
-        this.activeEditor.disable();
-        const layer = this.activeLayer;
-
-        if (this.finishControlInstance) {
-            App.state.map.removeControl(this.finishControlInstance);
-            this.finishControlInstance = null;
-        }
-
-        const feature = App.Data.getFeatureById(layer.feature_internal_id);
-        if (feature) {
-            if (layer instanceof L.Marker) {
-                const newLatLng = layer.getLatLng();
-                feature.geometry.coordinates = [newLatLng.lng, newLatLng.lat];
-            } else {
-                feature.geometry = layer.toGeoJSON().geometry;
-            }
-        }
-
-        this.activeEditor = null;
-        this.activeLayer = null;
-
-        App.Map.renderGeoJSONLayer();
-        if (feature) {
-            App.Events.selectFeature(feature.properties._internalId);
-        }
+        this.setEditingMode(null);
     },
     renderObservationsList(feature, container) {
         container.innerHTML = '';
@@ -266,7 +287,7 @@ App.Events = {
                 App.UI.showConfirm('Delete Observation?', 'Are you sure you want to delete this observation?', () => {
                     feature.properties.observations.splice(index, 1);
                     this.renderObservationsList(feature, container);
-                    App.Map.renderGeoJSONLayer();
+                    App.Map.renderLayers();
                     App.Snapshot.render(feature);
                 });
             };
@@ -300,7 +321,7 @@ App.Events = {
             }
             // Re-render the list in the main edit modal
             this.renderObservationsList(feature, document.getElementById('observation-list'));
-            App.Map.renderGeoJSONLayer();
+            App.Map.renderLayers();
             App.Snapshot.render(feature);
         }, 'observation-modal');
     },
@@ -309,7 +330,7 @@ App.Events = {
         App.UI.showConfirm('Delete Feature', `Are you sure you want to delete "${featureToDelete.properties.Name || 'this feature'}"?`, () => {
             App.state.data.geojson.data.features = App.state.data.geojson.data.features.filter(f => f.properties._internalId !== featureToDelete.properties._internalId);
             document.getElementById('snapshot-container').innerHTML = '<p>Select a feature from the legend or map to view its details and a visual snapshot.</p>';
-            App.Map.renderGeoJSONLayer(); 
+            App.Map.renderLayers();
         });
     },
     handleOverlayToggle(e) {
@@ -318,32 +339,4 @@ App.Events = {
             else App.state.map.removeControl(App.state.dsmLegendControl);
         }
     },
-    handlePopupOpen(e) {
-        const popup = e.popup;
-        setTimeout(() => {
-            const map = App.state.map;
-            const popupSize = L.point(popup._container.offsetWidth, popup._container.offsetHeight);
-            const popupAnchor = map.latLngToContainerPoint(popup.getLatLng());
-            const mapSize = map.getSize();
-            
-            let panOffset = L.point(0, 0);
-
-            if (popupAnchor.x < 0) {
-                panOffset.x = popupAnchor.x - 10; // Pan right
-            }
-            if (popupAnchor.x + popupSize.x > mapSize.x) {
-                panOffset.x = popupAnchor.x + popupSize.x - mapSize.x + 10; // Pan left
-            }
-            if (popupAnchor.y < 0) {
-                panOffset.y = popupAnchor.y - 10; // Pan down
-            }
-            if (popupAnchor.y + popupSize.y > mapSize.y) {
-                panOffset.y = popupAnchor.y + popupSize.y - mapSize.y + 10; // Pan up
-            }
-
-            if (panOffset.x !== 0 || panOffset.y !== 0) {
-                map.panBy(panOffset, { animate: true });
-            }
-        }, 10); // Short delay to allow popup to render
-    }
 };

@@ -94,7 +94,7 @@ App.Legend = {
 
             categoryVisibilityToggle.onchange = e => {
                 App.state.categoryVisibility[categoryName] = e.target.checked;
-                App.Map.renderGeoJSONLayer();
+            App.Map.renderLayers();
             };
         }
     },
