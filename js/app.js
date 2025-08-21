@@ -8,8 +8,6 @@ window.App = {
         data: {
             ortho: { georaster: null, fileBuffer: null, layer: null },
             dsm: { georaster: null, fileBuffer: null, layer: null },
-            tileset: { data: null, url: null },
-            pointcloud: { data: null, url: null },
             geojson: { data: { type: 'FeatureCollection', features: [] }, fileContent: null }, 
             logo: null, 
             categories: {}, 
@@ -22,18 +20,6 @@ window.App = {
         featureIdToLayerMap: new Map(),
         categoryVisibility: {},
         showOnlyWithObservations: false,
-        editingMode: null,
-        measurementMode: null,
-        measurementPoints: [],
-        layerVisibility: {
-            features: true,
-            ortho: false,
-            dsm: false,
-            dtm: false
-        },
-        terrain: false,
-        pointCloudStyling: 'none',
-        heatmap: false,
         quillInstances: {
             contributorBio: null
         }

@@ -4,7 +4,6 @@ window.App = window.App || {};
 App.UI = {
     elements: {}, 
     init() {
-        // The report-status-badge was part of the old UI and has been removed in the redesign.
         this.elements.modal = document.getElementById('modal'); 
         this.elements.loader = document.getElementById('loader');
         this.elements.loaderText = document.getElementById('loader-text');
@@ -16,9 +15,7 @@ App.UI = {
         this.elements.observationModal = document.getElementById('observation-modal');
         this.elements.defineBoundaryBtn = document.getElementById('define-boundary-btn');
         this.elements.clearBoundaryBtn = document.getElementById('clear-boundary-btn');
-
     },
-
     showLoader(text = 'Loading...') { this.elements.loaderText.innerText = text; this.elements.loader.classList.remove('hidden'); },
     hideLoader() { this.elements.loader.classList.add('hidden'); },
     showMessage(title, message) {

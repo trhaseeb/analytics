@@ -26,7 +26,7 @@ App.ImportExport = {
                 });
                 App.CategoryManager.updateSvgPatternDefs(); 
                 App.CategoryManager.render(); 
-                App.Map.renderLayers();
+                App.Map.renderGeoJSONLayer();
                 App.UI.showMessage('Success', 'Categories imported successfully.');
             } else throw new Error("File does not appear to be a valid category JSON.");
         } catch (e) { App.UI.showMessage("Import Error", `Could not import categories: ${e.message}`); }
@@ -38,9 +38,9 @@ App.ImportExport = {
             if (geojsonToSave.features) {
                 geojsonToSave.features.forEach(f => { if (f.properties) delete f.properties._internalId; });
             }
-            const viewState = App.state.map.props.viewState;
+            const center = App.state.map.getCenter();
             const projectData = {
-                version: "2.0.0",
+                version: "1.9.2",
                 title: document.getElementById('main-title').childNodes[0].nodeValue.trim(),
                 description: document.getElementById('main-description').innerHTML,
                 logo: App.state.data.logo,
@@ -49,7 +49,7 @@ App.ImportExport = {
                 reportInfo: App.state.data.reportInfo, 
                 geojson: geojsonToSave,
                 projectBoundary: App.state.projectBoundary.geojson,
-                mapView: viewState,
+                mapView: { center: { lat: center.lat, lng: center.lng }, zoom: App.state.map.getZoom() },
                 categoryVisibility: App.state.categoryVisibility,
                 showOnlyWithObservations: App.state.showOnlyWithObservations,
                 exportTimestamp: new Date().toISOString() 
@@ -177,35 +177,18 @@ App.ImportExport = {
             // Render everything
             App.CategoryManager.updateSvgPatternDefs(); 
             App.CategoryManager.render(); 
-            App.Map.renderLayers();
+            App.Map.renderGeoJSONLayer();
             App.ContributorManager.render(); 
             App.UI.updateReportStatusDisplay();
 
             // Set map view last, after layers are on the map
             if (data.projectBoundary) {
                 App.Map.setBoundary(data.projectBoundary, true); // This will fit the view
-            } else if (data.mapView) {
-                App.state.map.setProps({
-                    initialViewState: {
-                        ...App.state.map.props.initialViewState,
-                        ...data.mapView
-                    }
-                });
-            } else if (data.geojson?.features?.length > 0) {
-                const [minX, minY, maxX, maxY] = turf.bbox(data.geojson);
-                const { longitude, latitude, zoom } = new WebMercatorViewport({
-                    width: App.state.map.width,
-                    height: App.state.map.height
-                }).fitBounds([[minX, minY], [maxX, maxY]], { padding: 20 });
-
-                App.state.map.setProps({
-                    initialViewState: {
-                        ...App.state.map.props.initialViewState,
-                        longitude,
-                        latitude,
-                        zoom
-                    }
-                });
+            } else if (App.state.geojsonLayer.getLayers().length > 0) {
+                const bounds = App.state.geojsonLayer.getBounds();
+                if (bounds.isValid()) App.state.map.fitBounds(bounds.pad(0.1));
+            } else if (data.mapView?.center) {
+                App.state.map.setView(data.mapView.center, data.mapView.zoom);
             }
 
             App.UI.showMessage('Import Complete', 'Project loaded successfully. Re-select raster files if they were part of the original project.');
@@ -223,7 +206,7 @@ App.ImportExport = {
             App.CategoryManager.updateSvgPatternDefs(); 
             App.CategoryManager.render(); 
             try {
-                App.Map.renderLayers();
+                App.Map.renderGeoJSONLayer();
             } catch (e) {
                 console.warn('Map rendering failed during GeoJSON import (likely missing map dependencies):', e.message);
             }

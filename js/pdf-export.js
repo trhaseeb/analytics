@@ -242,28 +242,80 @@ App.PDFExport = {
 
     async buildAndCaptureMapPage(doc, title, mode) {
         const { w, h } = this.cfg.ledgerLandscape;
-
-        // Temporarily set the visibility of layers for the PDF export
-        const originalVisibility = { ...App.state.layerVisibility };
-        App.state.layerVisibility.features = true;
-        App.state.layerVisibility.ortho = mode === 'ortho';
-        App.state.layerVisibility.dsm = mode === 'dsm';
-        App.state.layerVisibility.dtm = false; // DTM not yet supported for PDF
-
-        App.Map.renderLayers();
-        await new Promise(r => setTimeout(r, 1000)); // Wait for layers to render
-
-        const mapImage = await App.state.map.getScreenshot();
-
-        // Restore original visibility
-        App.state.layerVisibility = originalVisibility;
-        App.Map.renderLayers();
-
-        const pageEl = this.buildPage(`<div id="map-wrapper" style="position:relative;width:100%;height:100%;padding:0;margin:0;">
+        const pageEl = this.buildPage(`<div id="map-wrapper" style="position:relative;width:100%;height:100%;padding:0;margin:0; border: 1px solid #000;">
             <div class="map-title">${title}</div>
-            <img src="${mapImage}" style="width:100%;height:100%;object-fit:cover;" />
-        </div>`, w, h, { paddingPx: 0 });
+            <div id="pdf-map" style="position:absolute;inset:0"></div>
+        </div>`, w, h, { paddingPx: 0, svgDefs: this.getSvgDefs() });
 
+        const mapDiv = pageEl.querySelector('#pdf-map');
+        const map = L.map(mapDiv, {
+            zoomControl: false, attributionControl: false, zoomAnimation: false,
+            fadeAnimation: false, markerZoomAnimation: false, inertia: false,
+            renderer: L.svg()
+        });
+
+        if (mode === 'default') {
+            mapDiv.style.backgroundColor = 'white';
+        } else if (mode === 'ortho' && App.state.data.ortho?.georaster) {
+            new GeoRasterLayer({ georaster: App.state.data.ortho.georaster, opacity: 1, resolution: 256 }).addTo(map);
+        } else if (mode === 'dsm' && App.state.data.dsm?.georaster) {
+            const { georaster } = App.state.data.dsm;
+            const { mins, maxs, noDataValue } = georaster;
+            const colorScale = chroma.scale(['#3b82f6', '#6ee7b7', '#fde047', '#f97316', '#ef4444']).domain([mins[0], maxs[0]]);
+            new GeoRasterLayer({ georaster, opacity: 0.9, resolution: 256, pixelValuesToColorFn: values => (values[0] === noDataValue) ? null : colorScale(values[0]).hex() }).addTo(map);
+        } else {
+            L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'], crossOrigin: 'anonymous' }).addTo(map);
+        }
+
+        const allGeo = App.state.data.geojson?.data;
+        if (allGeo && allGeo.features.length > 0) {
+            const vecLayer = L.geoJSON(allGeo, {
+                style: f => App.CategoryManager.getCategoryStyleForFeature(f),
+                pointToLayer: (f, latlng) => App.CategoryManager.createPointMarker(f, latlng),
+                onEachFeature: (f, l) => {
+                    const hasObservations = f.properties.observations && f.properties.observations.length > 0;
+                    const showLabel = f.properties.showLabel || (hasObservations && f.properties.Name);
+                    if (f.properties.Name && showLabel) {
+                        let labelContent = '';
+                        let tooltipClass = 'leaflet-tooltip-label';
+                        if (f.properties.showLabel) {
+                            labelContent += `<span>${f.properties.Name}</span>`;
+                        }
+                        if (hasObservations) {
+                            const highestSeverity = App.Utils.getHighestSeverity(f.properties.observations);
+                            const color = App.Utils.getColorForSeverity(highestSeverity);
+                            const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="${color}" style="filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5));"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2V7h2v7z"/></svg>`;
+                            labelContent += iconSvg;
+                            if (!f.properties.showLabel) {
+                                tooltipClass += ' leaflet-tooltip-icon-only';
+                            }
+                        }
+                        l.bindTooltip(labelContent, { permanent: true, direction: 'top', offset: [0, -10], className: tooltipClass });
+                    }
+                    const style = App.CategoryManager.getCategoryStyleForFeature(f);
+                    if (f.geometry.type.includes('LineString') && style.linePattern === 'arrows') {
+                        L.polylineDecorator(l, {
+                            patterns: [{ offset: '15%', repeat: style.lineSpacing * 2, symbol: L.Symbol.arrowHead({ pixelSize: 12, polygon: false, pathOptions: { stroke: true, color: style.color, weight: style.weight, opacity: style.opacity }}) }]
+                        }).addTo(map);
+                    }
+                }
+            }).addTo(map);
+
+            const bounds = App.state.projectBoundary.geojson ? L.geoJSON(App.state.projectBoundary.geojson).getBounds() : vecLayer.getBounds();
+            if (bounds.isValid()) {
+                try {
+                    // MODIFICATION: Use the new configurable map padding for more zoom
+                    map.fitBounds(bounds.pad(this.cfg.mapFitPadding));
+                } catch (e) {
+                   console.warn("Could not fit bounds for PDF map", e);
+                   if (App.state.map) map.setView(App.state.map.getCenter(), App.state.map.getZoom());
+                }
+            }
+        } else if (App.state.map) {
+            map.setView(App.state.map.getCenter(), App.state.map.getZoom());
+        }
+
+        await new Promise(r => setTimeout(r, 2500)); // Wait for tiles
         const img = await this.captureElement(pageEl, w, h, this.cfg.mapScale);
         doc.addPage([w, h], 'landscape');
         doc.addImage(img, 'PNG', 0, 0, w, h, undefined, 'FAST');
@@ -369,56 +421,89 @@ App.PDFExport = {
                     this.fallbackMapDisplay(container, "Missing required elements");
                     return resolve();
                 }
-
-                const [minX, minY, maxX, maxY] = turf.bbox(feature);
-                const { longitude, latitude, zoom } = new WebMercatorViewport({
-                    width: 200,
-                    height: 200
-                }).fitBounds([[minX, minY], [maxX, maxY]], { padding: 20 });
-
-                const miniDeck = new deck.DeckGL({
-                    container: container,
-                    mapStyle: 'mapbox://styles/mapbox/satellite-v9',
-                    initialViewState: {
-                        longitude,
-                        latitude,
-                        zoom
-                    },
-                    controller: false,
-                    mapboxApiAccessToken: 'pk.eyJ1IjoiZGVmYXVsdC11c2VyIiwiYSI6ImNscjB4Z2t2bjFwZWMya3FzMHV2M3M3N2cifQ.50t0m5s-s2FSp3uLwH2nhQ'
-                });
-
-                const layer = new deck.GeoJsonLayer({
-                    id: `mini-map-layer-${feature.properties._internalId}`,
-                    data: feature,
-                    stroked: true,
-                    filled: true,
-                    pointType: 'circle',
-                    getFillColor: f => {
-                        const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                        const color = chroma(style.fillColor || '#ff8c00').rgb();
-                        return [color[0], color[1], color[2], (style.fillOpacity || 0.8) * 255];
-                    },
-                    getLineColor: f => {
-                        const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                        const color = chroma(style.color || '#000000').rgb();
-                        return [color[0], color[1], color[2], (style.opacity || 1) * 255];
-                    },
-                    getLineWidth: f => {
-                        const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                        return style.weight || 1;
-                    },
-                    getPointRadius: f => {
-                        const style = App.CategoryManager.getCategoryStyleForFeature(f);
-                        return style.size ? style.size / 2 : 8;
+                if (!feature.geometry.type || !Array.isArray(feature.geometry.coordinates)) {
+                    console.error("Malformed geometry for feature:", feature.properties.Name, feature.geometry);
+                    this.fallbackMapDisplay(container, "Malformed geometry");
+                    return resolve();
+                }
+                if (feature.geometry.type === 'Point') {
+                    const coords = feature.geometry.coordinates;
+                    if (!Array.isArray(coords) || coords.length < 2 || !isFinite(coords[0]) || !isFinite(coords[1])) {
+                         console.error("Invalid coordinates for point feature:", feature.properties.Name, coords);
+                         this.fallbackMapDisplay(container, "Invalid feature coordinates");
+                         return resolve();
                     }
+                } else if (feature.geometry.coordinates.length === 0) {
+                    console.error("Empty coordinates for feature:", feature.properties.Name);
+                    this.fallbackMapDisplay(container, "Empty feature coordinates");
+                    return resolve();
+                }
+
+                const map = L.map(container, {
+                    zoomControl: false, attributionControl: false, dragging: false,
+                    scrollWheelZoom: false, renderer: L.svg(), keyboard: false,
+                    touchZoom: false, doubleClickZoom: false
                 });
 
-                miniDeck.setProps({ layers: [layer] });
+                map.createPane('basemap');
+                map.getPane('basemap').style.zIndex = 200;
+                map.createPane('vectors');
+                map.getPane('vectors').style.zIndex = 450;
 
-                setTimeout(() => {
-                    resolve();
-                }, 1000); // Wait for map to render
+                const svg = map.getRenderer(map)._container;
+                if (svg && App.state.svgPatternDefs) {
+                    svg.appendChild(App.state.svgPatternDefs.cloneNode(true));
+                }
+
+                let isBaseLayerLoaded = false;
+                const onBaseLoad = () => {
+                    if (isBaseLayerLoaded) return;
+                    isBaseLayerLoaded = true;
+                    setTimeout(() => {
+                        try {
+                            map.invalidateSize();
+                        } catch(e) {
+                            console.warn("Error during invalidateSize on mini-map", e);
+                        }
+                        resolve();
+                    }, 300);
+                };
+                setTimeout(() => { if (!isBaseLayerLoaded) { onBaseLoad(); } }, 4000);
+
+                if (App.state.data.ortho?.georaster) {
+                    new GeoRasterLayer({ georaster: App.state.data.ortho.georaster, opacity: 1, resolution: 256, pane: 'basemap' }).on('load', onBaseLoad).addTo(map);
+                } else {
+                    L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'], crossOrigin: 'anonymous', pane: 'basemap' }).on('load', onBaseLoad).addTo(map);
+                }
+
+                const vectorLayer = L.geoJSON(feature, {
+                    pane: 'vectors',
+                    style: f => App.CategoryManager.getCategoryStyleForFeature(f),
+                    pointToLayer: (f, latlng) => App.CategoryManager.createPointMarker(f, latlng),
+                    onEachFeature: (f, l) => {
+                        l.off(); // Remove interactivity
+                        const style = App.CategoryManager.getCategoryStyleForFeature(f);
+                        if (f.geometry.type.includes('LineString') && style.linePattern === 'arrows') {
+                            L.polylineDecorator(l, {
+                                patterns: [{ offset: '15%', repeat: style.lineSpacing * 2, symbol: L.Symbol.arrowHead({ pixelSize: 12, polygon: false, pathOptions: { stroke: true, color: style.color, weight: style.weight, opacity: style.opacity }}) }]
+                            }).addTo(map);
+                        }
+                    }
+                }).addTo(map);
+
+                if (feature.geometry.type === 'Point') {
+                    const coords = feature.geometry.coordinates;
+                    map.setView([coords[1], coords[0]], 18);
+                } else {
+                    const bounds = vectorLayer.getBounds();
+                    if (bounds.isValid()) {
+                        // MODIFICATION: Use the new configurable map padding for more zoom
+                        map.fitBounds(bounds.pad(this.cfg.mapFitPadding));
+                    } else {
+                        console.warn("Could not determine valid bounds for non-point feature:", feature.properties.Name);
+                        map.setView([0, 0], 2);
+                    }
+                }
 
             } catch (e) {
                 console.error("Error rendering mini map:", e, feature?.properties?.Name);

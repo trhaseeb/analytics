@@ -4,13 +4,18 @@ window.App = window.App || {};
 App.Data = {
     getFeatureById: id => App.state.data.geojson.data?.features.find(f => f.properties._internalId === id),
     async handleRasterUpload(event, type) {
-        App.UI.showPrompt('Enter Tile URL Template', [{ id: 'url', label: 'URL Template', value: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', type: 'text' }], (results) => {
-            if (results.url) {
-                App.state.data[type].url = results.url;
-                App.Map.renderLayers();
-                App.UI.elements.geodataModal.classList.add('hidden');
-            }
-        });
+        const file = event.target.files[0];
+        if (!file) return;
+        App.UI.showLoader(`Loading ${type.toUpperCase()}...`);
+        try {
+            const fileBuffer = await App.Utils.readFile(file, 'arrayBuffer');
+            const georaster = await parseGeoraster(fileBuffer);
+            App.state.data[type] = { georaster, fileBuffer, layer: App.state.data[type].layer };
+            this.addOrUpdateRasterLayer(type);
+        } catch (error) {
+            console.error(`Raster Error (${type}):`, error);
+            App.UI.showMessage('File Error', `Failed to load ${file.name}. Please ensure it's a valid GeoTIFF.`);
+        } finally { App.UI.hideLoader(); }
     },
     processAndInitializeFeatures(geojson) {
         if (!geojson?.features) return;
@@ -42,18 +47,61 @@ App.Data = {
             App.UI.showMessage('Import Note', `${assignedDefaultCount} feature(s) had missing or invalid categories and were assigned to the "${defaultCategoryName}" category.`);
         }
     },
+    addOrUpdateRasterLayer(type) {
+        const data = App.state.data[type];
+        if (!data.georaster) return;
+        if (data.layer) { App.state.layersControl.removeLayer(data.layer); App.state.map.removeLayer(data.layer); }
+        const layerOptions = { georaster: data.georaster, opacity: 1.0, resolution: 256 };
+        if (type === 'dsm') {
+            const { mins, maxs, noDataValue } = data.georaster;
+            if (isFinite(mins?.[0]) && isFinite(maxs?.[0])) {
+                const colorScale = chroma.scale(['#3b82f6', '#6ee7b7', '#fde047', '#f97316', '#ef4444']).domain([mins[0], maxs[0]]);
+                layerOptions.pixelValuesToColorFn = values => (values[0] === noDataValue) ? null : colorScale(values[0]).hex();
+                this.createDSMLegend(mins[0], maxs[0]);
+            } else App.UI.showMessage('DSM Info', 'Could not determine elevation range for DSM styling.');
+        }
+        data.layer = new GeoRasterLayer(layerOptions).addTo(App.state.map);
+        App.state.layersControl.addOverlay(data.layer, type === 'ortho' ? 'Orthophoto' : 'Digital Surface Model');
+        App.state.map.fitBounds(data.layer.getBounds());
+    },
+    createDSMLegend(min, max) {
+        if (App.state.dsmLegendControl) App.state.map.removeControl(App.state.dsmLegendControl);
+        App.state.dsmLegendControl = L.control({ position: 'bottomright' });
+        App.state.dsmLegendControl.onAdd = () => {
+            const div = L.DomUtil.create('div', 'dsm-legend');
+            const colorScale = chroma.scale(['#3b82f6', '#6ee7b7', '#fde047', '#f97316', '#ef4444']).domain([min, max]);
+            const gradientStyle = `linear-gradient(to top, ${colorScale.colors(10).join(',')})`;
+            div.innerHTML = `<div class="dsm-legend-title">DSM Elevation (m)</div><div class="flex"><div class="dsm-legend-gradient" style="background: ${gradientStyle};"></div><div class="dsm-legend-labels ml-1">${[...Array(6)].map((_, i) => { const value = min + (i / 5) * (max - min); return `<span style="top: ${100 - (i/5)*100}%;">${value.toFixed(1)}</span>`; }).join('')}</div></div>`;
+            return div;
+        };
+        if (App.state.data.dsm.layer && App.state.map.hasLayer(App.state.data.dsm.layer)) {
+             App.state.dsmLegendControl.addTo(App.state.map);
+        }
+    },
     /**
      * This function resets the application to a clean state, ready for a new project import.
      * It surgically removes only the application-specific overlay layers and data,
      * preserving the base map and main controls for a smoother user experience.
     */
     resetAppState() {
-        // 1. Reset project boundary
+        // 1. Remove overlay layers from map and control
+        if (App.state.layersControl) {
+            if (App.state.data.ortho.layer) App.state.layersControl.removeLayer(App.state.data.ortho.layer);
+            if (App.state.data.dsm.layer) App.state.layersControl.removeLayer(App.state.data.dsm.layer);
+        }
+        if (App.state.data.ortho.layer) App.state.map.removeLayer(App.state.data.ortho.layer);
+        if (App.state.data.dsm.layer) App.state.map.removeLayer(App.state.data.dsm.layer);
+
+        // 2. Clear dynamic layer groups
+        if (App.state.geojsonLayer) App.state.geojsonLayer.clearLayers();
+        App.state.decoratorLayers.forEach(d => d.remove());
+
+        // 3. Reset project boundary and associated map constraints
         App.Map.clearBoundary();
 
-        // 2. Remove DSM legend if it exists
+        // 4. Remove DSM legend if it exists
         if (App.state.dsmLegendControl) {
-            App.state.dsmLegendControl.remove();
+            App.state.map.removeControl(App.state.dsmLegendControl);
             App.state.dsmLegendControl = null;
         }
 
@@ -93,30 +141,5 @@ App.Data = {
         App.CategoryManager.render();
         App.ContributorManager.render();
         App.UI.updateReportStatusDisplay();
-    },
-
-    async handleTilesetUpload(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        App.state.data.tileset.url = URL.createObjectURL(file);
-        App.Map.renderLayers();
-        App.UI.elements.geodataModal.classList.add('hidden');
-    },
-
-    async handlePointCloudUpload(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        App.UI.showLoader('Loading Point Cloud...');
-        try {
-            const { LASLoader } = loaders;
-            const data = await LASLoader.parse(file);
-            App.state.data.pointcloud.data = data;
-            App.Map.renderLayers();
-        } catch (err) {
-            App.UI.showMessage('Error', `Failed to load point cloud: ${err.message}`);
-        } finally {
-            App.UI.hideLoader();
-            App.UI.elements.geodataModal.classList.add('hidden');
-        }
-    },
+    }
 };
