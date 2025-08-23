@@ -1,0 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+  
+  html {
+    @apply antialiased;
+  }
+  
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans m-0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  #root {
+    @apply w-screen h-screen overflow-hidden;
+  }
+}
+
+@layer components {
+  /* Glass morphism components */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-glass;
+  }
+
+  /* Home button animations */
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out forwards;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px) scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+  
+  .glass-dark {
+    @apply bg-slate-900/80 backdrop-blur-md border border-white/10 shadow-glass text-white;
+  }
+  
+  /* Button variants */
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-medium px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500/50;
+  }
+  
+  .btn-secondary {
+    @apply bg-white/90 backdrop-blur-sm text-slate-700 font-medium px-4 py-2 rounded-lg border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-200 hover:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50;
+  }
+  
+  .btn-ghost {
+    @apply text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 px-3 py-2 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500/50;
+  }
+  
+  .btn-icon {
+    @apply w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500/50;
+  }
+  
+  /* Input components */
+  .input-primary {
+    @apply bg-white/90 backdrop-blur-sm border border-slate-200/60 rounded-lg px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-200;
+  }
+  
+  /* Panel components */
+  .panel {
+    @apply glass rounded-xl p-6 animate-fade-in;
+  }
+  
+  .panel-compact {
+    @apply glass rounded-lg p-4;
+  }
+  
+  /* Floating panels */
+  .floating-panel {
+    @apply fixed z-50 glass rounded-xl shadow-glass-lg animate-slide-up;
+  }
+  
+  /* Status indicators */
+  .status-dot {
+    @apply w-2 h-2 rounded-full animate-pulse-soft;
+  }
+  
+  .status-online {
+    @apply bg-success-500;
+  }
+  
+  .status-warning {
+    @apply bg-warning-500;
+  }
+  
+  .status-error {
+    @apply bg-danger-500;
+  }
+  
+  /* Navigation */
+  .nav-tab {
+    @apply px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border-b-2 border-transparent hover:border-slate-200 transition-all duration-200;
+  }
+  
+  .nav-tab-active {
+    @apply text-primary-600 border-primary-500;
+  }
+  
+  /* Cards and surfaces */
+  .surface {
+    @apply bg-white rounded-lg border border-slate-200/60 shadow-sm;
+  }
+  
+  .surface-elevated {
+    @apply bg-white rounded-xl border border-slate-200/60 shadow-lg;
+  }
+  
+  /* Scrollbars */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.3) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    @apply w-1;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-slate-300/60 rounded-full;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400/60;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent;
+  }
+  
+  .bg-gradient-primary {
+    @apply bg-gradient-to-r from-primary-500 to-secondary-500;
+  }
+  
+  .bg-gradient-surface {
+    @apply bg-gradient-to-b from-white to-slate-50;
+  }
+}
